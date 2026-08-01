@@ -211,7 +211,7 @@
             <div id="gas-warning" class="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-lg text-yellow-800 text-xs flex items-start gap-2">
                 <i class="fa-solid fa-triangle-exclamation mt-0.5"></i>
                 <div>
-                    <strong>คำเตือน:</strong> หากต้องการให้ระบบบันทึกลง Google Sheets ถาวร ต้องใส่ URL ของ Apps Script ในโค้ดตัวแปร <code class="bg-yellow-100 px-1 rounded">GAS_WEB_APP_URL</code>
+                    <strong>คำเตือน:</strong> ระบบตอนนี้ผูกกับ Google Sheets 100% กรุณาใส่ URL ของ Apps Script ในโค้ดตัวแปร <code class="bg-yellow-100 px-1 rounded">GAS_WEB_APP_URL</code> เพื่อให้ดึงข้อมูลได้
                 </div>
             </div>
         </header>
@@ -319,34 +319,12 @@
     </div>
 
     <script>
-        // Master Data สินค้า
-        let globalProducts = [
-            "ปูนซีเมนต์ถุง", "ปูนซิเมนต์ผง", "คอนกรีตผสมเสร็จ", "เหล็กเส้น", 
-            "เหล็กเส้นข้ออ้อย", "อิฐมวลเบา", "กระเบื้องเซรามิก", "สุขภัณฑ์", 
-            "ท่อ PVC", "อุปกรณ์ฮาร์ดแวร์", "เครื่องมือช่าง", "สีทาอาคาร", 
-            "กระเบื้องหลังคา", "สีอุตสาหกรรม", "เคมีภัณฑ์ก่อสร้าง", "น้ำมันหล่อลื่น", 
-            "ปุ๋ยเคมี", "ประตูหน้าต่าง", "สินค้าอุปโภค", "เหล็กแผ่น", "เสาเข็ม"
-        ];
-
-        // Master Data คู่แข่ง
-        let globalCompetitors = [
-            "ไม่มีคู่แข่งหลัก",
-            "บริษัท เอ จำกัด",
-            "บริษัท บี จำกัด",
-            "บริษัท ซี จำกัด",
-            "บริษัท เลิศวสิน (2002) จำกัด",
-            "บริษัท วีระพานิช เชียงใหม่ จำกัด",
-            "บริษัท ซี.พี.เอส.โฮมเซ็นเตอร์ จำกัด"
-        ];
-
-        // MOCK DATA ลูกค้า
-        const mockCustomerData = [
-            { id: 1, name: "บจก. ลานนาเจริญทรัพย์", lat: 18.7883, lng: 98.9853, sales25: 12.5, sales26: 15.2, competitor: "บริษัท เอ จำกัด", walletShare: { "บริษัทของเรา": 15.2, "บริษัท เอ จำกัด": 8.0, "เจ้าอื่นๆ": 1.5 }, ourProducts: ["ปูนซีเมนต์ถุง", "เหล็กเส้น", "อิฐมวลเบา"], compProducts: ["กระเบื้องหลังคา", "ท่อ PVC"] },
-            { id: 2, name: "หจก. เชียงใหม่ค้าส่ง", lat: 18.8021, lng: 98.9841, sales25: 8.2, sales26: 7.9, competitor: "บริษัท บี จำกัด", walletShare: { "บริษัทของเรา": 7.9, "บริษัท บี จำกัด": 12.5, "เจ้าอื่นๆ": 3.0 }, ourProducts: ["กระเบื้องเซรามิก", "สุขภัณฑ์"], compProducts: ["ปูนซีเมนต์ถุง", "เหล็กเส้น"] },
-            { id: 3, name: "ร้านพาณิชย์นิมมาน", lat: 18.7955, lng: 98.9664, sales25: 5.4, sales26: 6.8, competitor: "ไม่มีคู่แข่งหลัก", walletShare: { "บริษัทของเรา": 6.8, "เจ้าอื่นๆ": 1.2 }, ourProducts: ["อุปกรณ์ฮาร์ดแวร์", "เครื่องมือช่าง", "สีทาอาคาร"], compProducts: [] },
-            { id: 4, name: "บมจ. อุตสาหกรรมภาคเหนือ", lat: 18.7612, lng: 99.0187, sales25: 45.0, sales26: 52.5, competitor: "บริษัท เอ จำกัด", walletShare: { "บริษัทของเรา": 52.5, "บริษัท เอ จำกัด": 30.0, "บริษัท ซี จำกัด": 15.0 }, ourProducts: ["คอนกรีตผสมเสร็จ", "เหล็กเส้นข้ออ้อย"], compProducts: ["เสาเข็ม", "ปูนซิเมนต์ผง"] }
-        ];
-
+        // เริ่มต้นด้วย Array ว่างเปล่า เพื่อรอรับข้อมูลจริงจาก Sheet
+        let globalProducts = [];
+        let globalCompetitors = [];
+        let globalData = [];
+        
+        // Mock ข้อมูลพิกัดร้านคู่แข่ง (ส่วนนี้อาจต้องทำ Master Data ใน Sheet อนาคต)
         const mockCompetitorStores = [
             { id: 'c1', name: "บ.เอ สาขาเมือง", lat: 18.7900, lng: 98.9800, competitor: "บริษัท เอ จำกัด", radiusKm: 3 },
             { id: 'c2', name: "บ.บี สาขาเหนือ", lat: 18.8100, lng: 98.9950, competitor: "บริษัท บี จำกัด", radiusKm: 3 },
@@ -355,11 +333,13 @@
 
         let map, customerLayerGroup, competitorStoreLayerGroup, dangerZoneLayerGroup;
         let salesChart, marketShareChart, customerWalletChartInstance = null;
-        let globalData = [];
         let currentFilter = "ALL";
         let currentProductFilter = "ALL";
         
+        // --- ส่วนสำคัญ: ใส่ URL ของ Web App ที่ได้จาก Google Apps Script ตรงนี้ ---
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbxkNNo2VqgXXl-MN104srUrQ1Ybfue6CUAhFL_2gnVaF9dhYuPalTCU4Yt3dxtHvLkE/exec"; 
+        // -------------------------------------------------------------------
+
         const colorPalette = ['#ef4444', '#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899'];
         let competitorColorMap = {};
 
@@ -387,34 +367,24 @@
                         document.getElementById('loading').style.opacity = '0';
                         setTimeout(() => document.getElementById('loading').style.display = 'none', 300);
                         
-                        globalData = data.customers && data.customers.length > 0 ? data.customers : mockCustomerData;
+                        // 3. นำข้อมูลจากแท็บ "Customers" มาอัปเดต
+                        globalData = data.customers || [];
                         initMap(); 
                         initDashboard();
                     })
                     .catch(err => {
                         console.error("เชื่อมต่อ Google Sheets ไม่สำเร็จ:", err);
-                        startWithMockData();
+                        document.getElementById('loading').innerHTML = '<p class="text-red-600 font-bold">เกิดข้อผิดพลาดในการดึงข้อมูลจาก Google Sheets</p><p class="text-xs text-gray-500 mt-2">โปรดตรวจสอบ URL ในโค้ด และสิทธิ์การเข้าถึง</p>';
                     });
             } else {
-                startWithMockData();
+                // กรณีที่ยังไม่ได้ใส่ URL
+                document.getElementById('loading').innerHTML = '<p class="text-yellow-600 font-bold">กรุณาใส่ URL ของ Apps Script ก่อนใช้งาน</p>';
+                console.warn("GAS_WEB_APP_URL ว่างเปล่า");
+                // เพื่อไม่ให้จอขาว จะให้สร้างหน้าเว็บเปล่าๆ รอไว้
+                initMap();
+                initDashboard();
             }
         });
-
-        function startWithMockData() {
-            globalProducts.sort();
-            globalCompetitors.sort();
-            renderProductCheckboxes();
-            renderCompetitorDropdown();
-            
-            setTimeout(() => {
-                document.getElementById('loading').style.opacity = '0';
-                setTimeout(() => document.getElementById('loading').style.display = 'none', 300);
-                
-                globalData = mockCustomerData; 
-                initMap(); 
-                initDashboard();
-            }, 800);
-        }
 
         // ฟังก์ชันเรนเดอร์ Dropdown คู่แข่งในฟอร์ม
         function renderCompetitorDropdown() {
