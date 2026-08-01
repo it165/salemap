@@ -10,7 +10,6 @@
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin=""/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
@@ -223,7 +222,7 @@
                         <div>
                             <label class="block text-xs font-bold text-gray-700 mb-1">คู่แข่งหลัก *</label>
                             <select id="form-comp" required class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 outline-none bg-white">
-                                <option value="" disabled selected>-- เลือกคู่แข่ง (ดึงจากระบบ) --</option>
+                                <option value="" disabled selected>-- โหลดรายชื่อคู่แข่ง... --</option>
                             </select>
                         </div>
                         <div class="grid grid-cols-2 gap-2">
@@ -252,14 +251,14 @@
                     <div class="mt-4 pt-2 border-t">
                         <label class="block text-xs font-bold text-blue-700 mb-2"><i class="fa-solid fa-check-square mr-1"></i> สินค้าที่ซื้อเรา (ติ๊กเลือกได้เลย)</label>
                         <div id="checkbox-our-products" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            <!-- JS จะสร้าง Checkbox สินค้าตรงนี้ -->
+                            <span class="text-xs text-gray-400 italic">กำลังโหลดรายการสินค้า...</span>
                         </div>
                     </div>
 
                     <div class="mt-4 pt-2 border-t border-dashed">
                         <label class="block text-xs font-bold text-red-600 mb-2"><i class="fa-solid fa-fire mr-1"></i> สินค้าที่หนีไปซื้อคู่แข่ง (ติ๊กเลือก)</label>
                         <div id="checkbox-comp-products" class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                            <!-- JS จะสร้าง Checkbox สินค้าตรงนี้ -->
+                            <span class="text-xs text-gray-400 italic">กำลังโหลดรายการสินค้า...</span>
                         </div>
                     </div>
                     
@@ -304,7 +303,7 @@
         let globalProducts = [];
         let globalCompetitors = [];
         let globalData = [];
-        let companyHQ = null; // เก็บข้อมูลบริษัทของเราที่ดึงจาก Sheet
+        let companyHQ = null;
 
         let map, customerLayerGroup, competitorStoreLayerGroup, dangerZoneLayerGroup;
         let salesChart, marketShareChart, customerWalletChartInstance = null;
@@ -319,21 +318,18 @@
                 fetch(GAS_WEB_APP_URL)
                     .then(response => response.json())
                     .then(data => {
-                        // 1. รับข้อมูลบริษัทของเรา (HQ)
                         companyHQ = data.company || { name: "บริษัทของเรา (HQ)", lat: 18.7953, lng: 98.9620 };
 
-                        // 2. รับข้อมูลสินค้า
-                        if (data.products) globalProducts = data.products.sort();
+                        if (data.products) globalProducts = data.products;
                         
-                        // 3. รับข้อมูลคู่แข่ง
                         if (data.competitors) {
                             globalCompetitors = data.competitors.sort((a,b) => a.CompetitorName.localeCompare(b.CompetitorName));
                         }
 
-                        // 4. รับข้อมูลลูกค้า
                         if (data.customers) {
-                            // แปลงคอลัมน์ที่เป็น Comma Separated ให้กลายเป็น Array 
-                            globalData = data.customers.map(c => ({
+                            globalData = data.customers
+                            .filter(c => c.Latitude && c.Longitude) // กรองเอาเฉพาะคนที่มีพิกัดเท่านั้น
+                            .map(c => ({
                                 ...c,
                                 name: c.CustomerName,
                                 lat: parseFloat(c.Latitude),
@@ -341,8 +337,8 @@
                                 sales25: parseFloat(c.Sales2025) || 0,
                                 sales26: parseFloat(c.Sales2026) || 0,
                                 competitor: c.MainCompetitor || "ไม่ระบุ",
-                                ourProducts: c["OurProducts(CommaSeparated)"] ? c["OurProducts(CommaSeparated)"].split(',').map(i => i.trim()) : [],
-                                compProducts: c["CompProducts(CommaSeparated)"] ? c["CompProducts(CommaSeparated)"].split(',').map(i => i.trim()) : [],
+                                ourProducts: c["OurProducts(CommaSeparated)"] ? String(c["OurProducts(CommaSeparated)"]).split(',').map(i => i.trim()).filter(i=>i) : [],
+                                compProducts: c["CompProducts(CommaSeparated)"] ? String(c["CompProducts(CommaSeparated)"]).split(',').map(i => i.trim()).filter(i=>i) : [],
                                 walletShare: {
                                     "บริษัทของเรา": parseFloat(c.WalletShare_Us) || 0,
                                     [c.MainCompetitor]: parseFloat(c.WalletShare_Competitor) || 0,
@@ -362,7 +358,7 @@
                     })
                     .catch(err => {
                         console.error("เชื่อมต่อ Google Sheets ไม่สำเร็จ:", err);
-                        document.getElementById('loading').innerHTML = '<p class="text-red-600 font-bold">เกิดข้อผิดพลาดในการดึงข้อมูลจาก Google Sheets</p><p class="text-xs text-gray-500 mt-2">โปรดตรวจสอบ URL และสิทธิ์การเข้าถึง (Anyone)</p>';
+                        document.getElementById('loading').innerHTML = '<p class="text-red-600 font-bold bg-white p-4 rounded shadow">เกิดข้อผิดพลาดในการดึงข้อมูล<br><span class="text-xs text-gray-500 font-normal">โปรดตรวจสอบ URL หรือโครงสร้างข้อมูลใน Sheet</span></p>';
                     });
             } else {
                 document.getElementById('loading').innerHTML = '<p class="text-yellow-600 font-bold bg-white p-4 rounded shadow">กรุณาใส่ URL ของ Apps Script ตรงตัวแปร GAS_WEB_APP_URL ในโค้ดก่อนใช้งาน</p>';
@@ -373,7 +369,6 @@
             const compSelect = document.getElementById('form-comp');
             compSelect.innerHTML = '<option value="" disabled selected>-- เลือกคู่แข่ง (ดึงจากระบบ) --</option>';
             
-            // ใช้ Set เพื่อไม่ให้ชื่อคู่แข่งซ้ำกันใน Dropdown (กรณีมีหลายสาขา)
             const uniqueCompNames = [...new Set(globalCompetitors.map(c => c.CompetitorName))];
             uniqueCompNames.forEach(compName => {
                 const opt = document.createElement('option');
@@ -393,19 +388,20 @@
                 ourHtml += `
                     <label class="checkbox-container relative cursor-pointer group">
                         <input type="checkbox" value="${prod}" class="our-prod-cb peer sr-only">
-                        <div class="px-2 py-1.5 text-[10px] md:text-xs text-center border border-gray-200 rounded-lg text-gray-600 group-hover:bg-gray-50 transition-colors select-none">
+                        <div class="px-2 py-1.5 text-[10px] md:text-xs text-center border border-gray-200 rounded-lg text-gray-600 group-hover:bg-gray-50 transition-colors select-none truncate" title="${prod}">
                             ${prod}
                         </div>
                     </label>`;
                 compHtml += `
                     <label class="checkbox-container-red relative cursor-pointer group">
                         <input type="checkbox" value="${prod}" class="comp-prod-cb peer sr-only">
-                        <div class="px-2 py-1.5 text-[10px] md:text-xs text-center border border-gray-200 rounded-lg text-gray-600 group-hover:bg-gray-50 transition-colors select-none">
+                        <div class="px-2 py-1.5 text-[10px] md:text-xs text-center border border-gray-200 rounded-lg text-gray-600 group-hover:bg-gray-50 transition-colors select-none truncate" title="${prod}">
                             ${prod}
                         </div>
                     </label>`;
             });
-            ourContainer.innerHTML = ourHtml; compContainer.innerHTML = compHtml;
+            ourContainer.innerHTML = ourHtml || '<span class="text-xs text-gray-400">ไม่พบข้อมูลสินค้า</span>'; 
+            compContainer.innerHTML = compHtml || '<span class="text-xs text-gray-400">ไม่พบข้อมูลสินค้า</span>';
         }
 
         function switchTab(tabName) {
@@ -426,9 +422,17 @@
 
         function initDashboard() {
             document.getElementById('competitor-filter').innerHTML = '<option value="ALL">คู่แข่ง (ทั้งหมด)</option>';
-            const uniqueCompetitors = [...new Set(globalData.map(item => item.competitor))].sort();
-            uniqueCompetitors.forEach((comp, index) => {
-                competitorColorMap[comp] = (comp === "ไม่มีคู่แข่งหลัก" || !comp) ? '#9ca3af' : colorPalette[index % colorPalette.length];
+            
+            // ใช้รายชื่อคู่แข่งจาก Master Data มาสร้างสี (เพื่อให้สีคงที่)
+            const uniqueMasterCompetitors = [...new Set(globalCompetitors.map(c => c.CompetitorName))];
+            uniqueMasterCompetitors.forEach((comp, index) => {
+                competitorColorMap[comp] = colorPalette[index % colorPalette.length];
+            });
+
+            // สร้าง Dropdown Filter เฉพาะคู่แข่งที่มีอยู่ในข้อมูลลูกค้าจริงๆ
+            const uniqueUsedCompetitors = [...new Set(globalData.map(item => item.competitor))].sort();
+            uniqueUsedCompetitors.forEach(comp => {
+                if(!competitorColorMap[comp]) competitorColorMap[comp] = '#9ca3af';
                 document.getElementById('competitor-filter').appendChild(new Option(comp, comp));
             });
 
@@ -444,11 +448,16 @@
                 document.getElementById('customer-navigator').appendChild(new Option(cust.name, cust.ID || cust.id));
             });
 
-            // Event Listeners
             document.getElementById('competitor-filter').addEventListener('change', (e) => { currentFilter = e.target.value; updateDashboard(); });
             document.getElementById('product-filter').addEventListener('change', (e) => { currentProductFilter = e.target.value; updateDashboard(); });
             document.getElementById('customer-navigator').addEventListener('change', (e) => { flyToCustomerAndOpenModal(e.target.value); });
-            document.getElementById('reset-view-btn').addEventListener('click', () => { currentFilter = "ALL"; currentProductFilter = "ALL"; document.getElementById('competitor-filter').value = "ALL"; document.getElementById('product-filter').value = "ALL"; updateDashboard(); map.setView([18.7883, 98.9853], 11); document.getElementById('reset-view-btn').classList.add('hidden'); });
+            document.getElementById('reset-view-btn').addEventListener('click', () => { 
+                currentFilter = "ALL"; currentProductFilter = "ALL"; 
+                document.getElementById('competitor-filter').value = "ALL"; document.getElementById('product-filter').value = "ALL"; 
+                updateDashboard(); 
+                if(customerLayerGroup.getLayers().length > 0) map.fitBounds(customerLayerGroup.getBounds(), { padding: [30, 30] });
+                document.getElementById('reset-view-btn').classList.add('hidden'); 
+            });
 
             updateDashboard();
         }
@@ -493,7 +502,7 @@
         function updateMapMarkers(data) {
             customerLayerGroup.clearLayers(); competitorStoreLayerGroup.clearLayers(); dangerZoneLayerGroup.clearLayers();
 
-            // 1. วาดหมุดบริษัทของเรา (Our HQ) จาก Sheet Settings
+            // 1. หมุดบริษัทของเรา (HQ)
             if (companyHQ && companyHQ.lat && companyHQ.lng) {
                 const hqIcon = L.divIcon({
                     className: '',
@@ -505,7 +514,7 @@
                 customerLayerGroup.addLayer(hqMarker); 
             }
 
-            // 2. วาดหมุดลูกค้า
+            // 2. หมุดลูกค้า
             data.forEach(item => {
                 const color = competitorColorMap[item.competitor] || '#3b82f6';
                 const customIcon = L.divIcon({
@@ -517,7 +526,7 @@
                 customerLayerGroup.addLayer(marker);
             });
 
-            // 3. วาดหมุดสาขาคู่แข่ง
+            // 3. หมุดสาขาคู่แข่ง
             let displayStores = currentFilter !== "ALL" ? globalCompetitors.filter(store => store.CompetitorName === currentFilter) : globalCompetitors;
             displayStores.forEach(store => {
                 if(store.Latitude && store.Longitude) {
@@ -528,18 +537,25 @@
                     
                     dangerZoneLayerGroup.addLayer(L.circle([lat, lng], { color: color, fillColor: color, fillOpacity: 0.1, weight: 1, dashArray: '4, 4', radius: radius * 1000 }));
                     
-                    const storeIcon = L.divIcon({ className: '', html: `<div style="background-color:${color}; width:14px; height:14px; border-radius:2px; border:1px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.5);"></div>`, iconSize: [14, 14], iconAnchor: [7, 7] });
+                    const storeIcon = L.divIcon({ className: '', html: `<div style="background-color:${color}; width:12px; height:12px; border-radius:2px; border:1px solid white; box-shadow:0 1px 3px rgba(0,0,0,0.5);"></div>`, iconSize: [12, 12], iconAnchor: [6, 6] });
                     competitorStoreLayerGroup.addLayer(L.marker([lat, lng], { icon: storeIcon }).bindPopup(`<div class="text-xs font-bold text-gray-800">${store.BranchName || store.CompetitorName}</div><div class="text-[10px] text-gray-500">รัศมีบริการ ${radius} km</div>`));
                 }
             });
             
-            if ((currentFilter !== "ALL" || currentProductFilter !== "ALL") && customerLayerGroup.getLayers().length > 0) {
-                map.fitBounds(customerLayerGroup.getBounds(), { padding: [30, 30], maxZoom: 13 });
-                document.getElementById('reset-view-btn').classList.remove('hidden');
+            if (customerLayerGroup.getLayers().length > 0) {
+                if (currentFilter !== "ALL" || currentProductFilter !== "ALL") {
+                    map.fitBounds(customerLayerGroup.getBounds(), { padding: [30, 30], maxZoom: 13 });
+                    document.getElementById('reset-view-btn').classList.remove('hidden');
+                } else if (!map.hasInitializedBounds) {
+                    map.fitBounds(customerLayerGroup.getBounds(), { padding: [30, 30] });
+                    map.hasInitializedBounds = true;
+                }
             }
         }
 
-        // จัดการ Submit ฟอร์ม ส่งไปเซฟลง Google Sheets
+        // ==========================================
+        // การบันทึกข้อมูลด้วยเทคนิค Text/Plain หลบ CORS
+        // ==========================================
         document.getElementById('add-customer-form').addEventListener('submit', function(e) {
             e.preventDefault();
             
@@ -551,11 +567,18 @@
 
             const ourProds = Array.from(document.querySelectorAll('.our-prod-cb:checked')).map(cb => cb.value);
             const compProds = Array.from(document.querySelectorAll('.comp-prod-cb:checked')).map(cb => cb.value);
-            const compName = document.getElementById('form-comp').value || "ไม่มีคู่แข่งหลัก";
+            const compName = document.getElementById('form-comp').value || "ไม่ระบุ";
             const sales26 = parseFloat(document.getElementById('form-s26').value) || 0;
 
+            // คำนวณ ID ใหม่
+            let newId = 1;
+            if (globalData.length > 0) {
+                const maxId = Math.max(...globalData.map(d => parseInt(d.ID || d.id || 0)));
+                newId = maxId + 1;
+            }
+
             const newCustomer = {
-                id: globalData.length > 0 ? Math.max(...globalData.map(d => d.ID || d.id || 0)) + 1 : 1,
+                id: newId,
                 name: document.getElementById('form-name').value,
                 lat: parseFloat(document.getElementById('form-lat').value),
                 lng: parseFloat(document.getElementById('form-lng').value),
@@ -570,26 +593,38 @@
                 }
             };
 
-            // ส่งข้อมูลไปบันทึก
+            // สร้าง Payload แบบ JSON
+            const payloadString = JSON.stringify({ action: 'addSingle', data: newCustomer });
+
+            // ใช้ fetch ส่งข้อมูลไปเป็น text/plain
             fetch(GAS_WEB_APP_URL, { 
                 method: 'POST', 
-                mode: 'no-cors', 
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'addSingle', data: newCustomer }) 
+                headers: { 
+                    'Content-Type': 'text/plain;charset=utf-8', 
+                },
+                body: payloadString 
             })
-            .then(() => {
-                // อัปเดตข้อมูลบนหน้าจอทันที (ไม่ต้องรอโหลดใหม่)
-                globalData.push(newCustomer);
-                if(!competitorColorMap[newCustomer.competitor]) competitorColorMap[newCustomer.competitor] = '#f59e0b';
-                
-                this.reset(); // ล้างฟอร์ม
-                initDashboard(); // วาดกราฟใหม่
-                
-                statusText.innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-check mr-1"></i> บันทึกสำเร็จ! ข้อมูลขึ้นแผนที่แล้ว</span>';
-                setTimeout(() => statusText.innerText = '* กรอกข้อมูลให้ครบถ้วน', 5000);
+            .then(response => response.json()) // รอรับคำตอบจาก Apps Script ว่าสำเร็จไหม
+            .then(result => {
+                if(result.status === "success") {
+                    // อัปเดตข้อมูลบนหน้าจอทันที
+                    newCustomer.ID = newId; // ทำให้เหมือนโครงสร้างที่ดึงจาก Sheet
+                    globalData.push(newCustomer);
+                    if(!competitorColorMap[newCustomer.competitor]) competitorColorMap[newCustomer.competitor] = '#f59e0b';
+                    
+                    this.reset(); // ล้างฟอร์ม
+                    initDashboard(); // วาดกราฟใหม่
+                    document.getElementById('data-count').innerText = globalData.length + ' ราย';
+                    
+                    statusText.innerHTML = '<span class="text-green-600 font-bold"><i class="fa-solid fa-check mr-1"></i> บันทึกลง Sheet สำเร็จ!</span>';
+                    setTimeout(() => statusText.innerText = '* กรอกข้อมูลให้ครบถ้วน', 5000);
+                } else {
+                    throw new Error(result.message || "Unknown error from server");
+                }
             })
             .catch(err => {
                 alert("เกิดข้อผิดพลาดในการบันทึก: " + err);
+                statusText.innerHTML = '<span class="text-red-600 font-bold"><i class="fa-solid fa-xmark mr-1"></i> บันทึกไม่สำเร็จ</span>';
             })
             .finally(() => {
                 btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-2"></i> บันทึกเข้าระบบ';
@@ -659,6 +694,7 @@
             document.getElementById('modal-cust-name').innerText = customer.name;
             const totalValue = Object.values(customer.walletShare).reduce((a, b) => a + b, 0);
             document.getElementById('modal-total-value').innerText = totalValue.toFixed(1);
+            
             document.getElementById('modal-our-products').innerHTML = customer.ourProducts.length ? customer.ourProducts.map(p => `<li>${p}</li>`).join('') : '<li class="text-gray-400 list-none text-xs italic">ไม่มีข้อมูล</li>';
             document.getElementById('modal-comp-products').innerHTML = customer.compProducts.length ? customer.compProducts.map(p => `<li>${p}</li>`).join('') : '<li class="text-gray-400 list-none text-xs italic">ไม่มีข้อมูล</li>';
 
