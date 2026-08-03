@@ -92,7 +92,7 @@
         <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
             <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
                 <div class="px-5 py-4 border-b border-gray-50 bg-gray-50/50 flex items-center">
-                    <h2 class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-map-location-dot text-indigo-500 mr-2"></i> แผนที่</h2>
+                    <h2 class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-map-location-dot text-indigo-500 mr-2"></i> แผนที่สมรภูมิการค้า</h2>
                 </div>
                 <div id="map" class="w-full h-[55vh] z-10"></div>
             </div>
@@ -109,7 +109,7 @@
         <!-- Data Table Section -->
         <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 mb-8">
             <div class="px-5 py-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
-                <h2 class="font-bold text-gray-700 text-sm">ข้อมูลลูกค้า</h2>
+                <h2 class="font-bold text-gray-700 text-sm">ข้อมูลลูกค้ารายตัว</h2>
                 <span class="text-xs text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full font-medium" id="table-count">0 รายการ</span>
             </div>
             <div class="overflow-x-auto">
@@ -175,8 +175,8 @@
             
             <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-gray-100 gap-4">
                 <div>
-                    <h2 class="text-xl font-bold text-gray-800 flex items-center"><i class="fa-solid fa-file-signature text-indigo-500 mr-3"></i>บันทึกข้อมูล</h2>
-                    <p class="text-xs text-gray-500 mt-1 ml-8">เพิ่มข้อมูลลูกค้า พิกัดร้านค้า</p>
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center"><i class="fa-solid fa-file-signature text-indigo-500 mr-3"></i>บันทึกข้อมูลการตลาดใหม่</h2>
+                    <p class="text-xs text-gray-500 mt-1 ml-8">เพิ่มข้อมูลลูกค้า พิกัดร้านค้า และยอดขายแยกตามรายการสินค้าได้อย่างอิสระ</p>
                 </div>
             </div>
 
@@ -207,7 +207,7 @@
                         </div>
                         
                         <div class="md:col-span-2 mt-2">
-                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-2">คู่แข่ง (เลือกได้หลายราย)</label>
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-2">คู่แข่งที่กำลังปะทะอยู่ (เลือกได้หลายราย)</label>
                             <div id="checkbox-competitors" class="flex flex-wrap gap-2">
                                 <!-- Dynamic Checkboxes render here -->
                             </div>
@@ -341,44 +341,59 @@
         function updateDashboard() {
             const tbody = document.getElementById('data-table-body'); 
             tbody.innerHTML = '';
-            customerLayer.clearLayers();
+            if(customerLayer) customerLayer.clearLayers();
             
             let totalSales = 0;
             let counter = 0;
-            let compCounts = {}; // นับว่าเจอคู่แข่งไหนบ่อยสุด
+            let compCounts = {};
+
+            // ตรวจสอบขั้นต่ำ: ถ้าไม่มีข้อมูลลูกค้าเลย ให้หยุดแค่นี้
+            if (!globalData.customers || globalData.customers.length === 0) {
+                console.warn("ยังไม่มีข้อมูลลูกค้าในระบบ หรือดึงข้อมูลจากแท็บ Customers ไม่สำเร็จ");
+                return;
+            }
 
             globalData.customers.forEach(c => {
-                // ข้ามคนที่ไม่มีพิกัด
-                if(!c.Latitude || !c.Longitude) return;
+                // 1. ดึงพิกัดแบบยืดหยุ่น (รองรับชื่อคอลัมน์หลากหลาย)
+                const lat = parseFloat(c.Latitude || c.Lat || c.lat || 0);
+                const lng = parseFloat(c.Longitude || c.Lng || c.lng || 0);
 
-                const sales = parseFloat(c.Sales2026 || 0);
+                // ถ้าไม่มีพิกัดที่ถูกต้อง ให้ข้ามลูกค้ารายนี้ไป
+                if(!lat || !lng || isNaN(lat) || isNaN(lng)) return;
+
+                // 2. ดึงข้อมูลพื้นฐาน (ถ้าไม่มีก็ใส่ค่าเริ่มต้นไว้ก่อน)
+                const custName = c.CustomerName || c.Name || "ลูกค้าไม่ระบุชื่อ";
+                const sales = parseFloat(c.Sales2026_Baht || c.Sales2026 || c.Sales2025 || 0);
+                const custId = c.ID || counter;
+                const mainComp = c.MainCompetitors || c.MainCompetitor || "";
+                
                 totalSales += sales;
                 counter++;
                 
-                // นับคู่แข่ง
-                if (c.MainCompetitor) {
-                    const comps = c.MainCompetitor.split(',').map(s=>s.trim()).filter(s=>s!=="");
+                // นับคู่แข่งสำหรับทำกราฟ
+                if (mainComp) {
+                    const comps = mainComp.toString().split(',').map(s=>s.trim()).filter(s=>s!=="");
                     comps.forEach(cp => {
                         compCounts[cp] = (compCounts[cp] || 0) + 1;
                     });
                 }
-                
+
                 // สร้างแถวตารางลูกค้า
                 tbody.innerHTML += `
                 <tr class="hover:bg-gray-50 transition-colors">
                     <td class="px-5 py-3 border-b border-gray-100">
                         <div class="flex items-center gap-3">
                             <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-store text-xs"></i></div>
-                            <span class="text-sm font-semibold text-gray-800">${c.CustomerName}</span>
+                            <span class="text-sm font-semibold text-gray-800">${custName}</span>
                         </div>
                     </td>
                     <td class="px-5 py-3 border-b border-gray-100 text-sm text-right font-bold text-gray-600">${sales.toLocaleString()}</td>
                     <td class="px-5 py-3 border-b border-gray-100 text-center">
-                        <button onclick="openModal('${c.ID}')" class="bg-white border border-gray-200 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 text-xs px-3 py-1.5 rounded-lg shadow-sm transition-colors font-medium">ดูข้อมูลสินค้า</button>
+                        <button onclick="openModal('${custId}')" class="bg-white border border-gray-200 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 text-xs px-3 py-1.5 rounded-lg shadow-sm transition-colors font-medium">ดูข้อมูล</button>
                     </td>
                 </tr>`;
 
-                // ปักหมุดบนแผนที่
+                // ปักหมุดบนแผนที่ (บังคับปักทันทีที่มี Lat, Lng)
                 const icon = L.divIcon({
                     className: '', 
                     html: `<div style="background:#4f46e5;color:white;width:28px;height:28px;border-radius:50%;border:2px solid white;box-shadow: 0 2px 4px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-store text-[10px]"></i></div>`, 
@@ -387,11 +402,10 @@
                 });
                 
                 customerLayer.addLayer(
-                    L.marker([c.Latitude, c.Longitude], {icon: icon}).bindPopup(`
+                    L.marker([lat, lng], {icon: icon}).bindPopup(`
                     <div class="text-center pb-1 min-w-[150px]">
-                        <div class="font-bold text-gray-800 text-sm border-b border-gray-100 pb-1 mb-2">${c.CustomerName}</div>
+                        <div class="font-bold text-gray-800 text-sm border-b border-gray-100 pb-1 mb-2">${custName}</div>
                         <div class="text-xs text-gray-500 mb-3">ยอดประเมิน: <span class="font-bold text-indigo-600">${sales.toLocaleString()}</span> บ.</div>
-                        <button onclick="openModal('${c.ID}')" class="w-full text-xs bg-indigo-600 hover:bg-indigo-700 transition-colors text-white px-3 py-2 rounded-lg shadow-sm font-medium">ดูสินค้าเปรียบเทียบ</button>
                     </div>`)
                 );
             });
@@ -415,8 +429,8 @@
             // วาดกราฟ
             renderChart(compCounts);
             
-            // ซูมแผนที่ให้พอดี
-            if(customerLayer.getLayers().length > 0) {
+            // เลื่อนกล้องแผนที่ให้ซูมพอดีกับหมุดทั้งหมดโดยอัตโนมัติ
+            if(customerLayer && customerLayer.getLayers().length > 0) {
                 map.fitBounds(customerLayer.getBounds(), {padding: [40, 40]});
             }
         }
