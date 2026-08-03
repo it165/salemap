@@ -4,231 +4,164 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <title>Sales & Category Analysis</title>
+    
+    <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Load FontAwesome (Icons) -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Load Leaflet (Map) -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    
+    <!-- Load Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap');
-        body { font-family: 'Prompt', sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Prompt', sans-serif; background-color: #f8fafc; }
+        
+        /* ซ่อน Scrollbar แต่ยังเลื่อนได้ */
         .hide-scrollbar::-webkit-scrollbar { display: none; }
         .hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-        .glass-header { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(10px); border-bottom: 1px solid rgba(229, 231, 235, 0.5); }
-        .loading-overlay { position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(255,255,255,0.9); display: flex; justify-content: center; align-items: center; z-index: 9999; }
-        .spinner { border: 4px solid #e5e7eb; border-left-color: #3b82f6; width: 40px; height: 40px; border-radius: 50%; animation: spin 1s linear infinite; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        .checkbox-container-purple input:checked + div { background-color: #f5f3ff; border-color: #8b5cf6; color: #6d28d9; font-weight: 600; box-shadow: 0 0 0 2px rgba(139, 92, 246, 0.2); }
-        .checkbox-container-purple div { transition: all 0.2s; }
         
-        /* สไตล์ตารางซ้อนทับกันแบบโมบายล์ (Card View) */
-        @media (max-width: 768px) {
-            .mobile-card-row { border-bottom: 1px solid #e5e7eb; padding-bottom: 1rem; margin-bottom: 1rem; }
-            .mobile-card-row:last-child { border-bottom: none; padding-bottom: 0; margin-bottom: 0; }
-        }
-        
-        /* ตกแต่ง Scrollbar ให้ดูเรียบร้อย */
+        /* ตกแต่ง Scrollbar พื้นฐาน */
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 10px; }
         ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+        
+        /* Custom Checkbox สำหรับคู่แข่ง */
+        .checkbox-comp input:checked + div { 
+            background-color: #eef2ff; 
+            border-color: #6366f1; 
+            color: #4f46e5; 
+            font-weight: 600; 
+            box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); 
+        }
     </style>
 </head>
-<body class="text-gray-800 pb-10 bg-gray-50">
+<body class="text-gray-800 pb-10">
 
-    <div class="bg-indigo-900 text-white sticky top-0 z-50 shadow-lg">
+    <div class="bg-indigo-900 text-white sticky top-0 z-[1000] shadow-lg">
         <div class="max-w-7xl mx-auto px-4 flex justify-between items-center h-14">
             <div class="font-bold text-lg flex items-center gap-2">
-                <i class="fa-solid fa-chart-pie text-indigo-300"></i> MarketSight
+                <div class="w-8 h-8 rounded-lg bg-indigo-500/30 flex items-center justify-center">
+                    <i class="fa-solid fa-chart-pie text-white"></i>
+                </div>
+                MarketSight
             </div>
             <div class="flex overflow-x-auto hide-scrollbar gap-1 h-full">
-                <button onclick="switchTab('dashboard')" id="btn-tab-dashboard" class="px-5 py-0 h-full text-sm font-medium border-b-4 border-indigo-400 text-white flex items-center whitespace-nowrap bg-indigo-800/50 transition-colors hover:bg-indigo-800"><i class="fa-solid fa-chart-line mr-2"></i> แดชบอร์ด</button>
-                <button onclick="switchTab('data')" id="btn-tab-data" class="px-5 py-0 h-full text-sm font-medium border-b-4 border-transparent text-indigo-200 flex items-center whitespace-nowrap transition-colors hover:bg-indigo-800 hover:text-white"><i class="fa-solid fa-pen-to-square mr-2"></i> บันทึกข้อมูล</button>
+                <button onclick="switchTab('dashboard')" id="btn-tab-dashboard" class="px-5 py-0 h-full text-sm font-medium border-b-4 border-indigo-400 text-white flex items-center whitespace-nowrap bg-indigo-800/50 transition-colors">
+                    <i class="fa-solid fa-chart-line mr-2"></i> แดชบอร์ด
+                </button>
+                <button onclick="switchTab('data')" id="btn-tab-data" class="px-5 py-0 h-full text-sm font-medium border-b-4 border-transparent text-indigo-200 flex items-center whitespace-nowrap transition-colors hover:bg-indigo-800 hover:text-white">
+                    <i class="fa-solid fa-pen-to-square mr-2"></i> บันทึกข้อมูล
+                </button>
             </div>
         </div>
+    </div>
+
+    <div id="loading" class="fixed inset-0 bg-white/90 z-[9999] flex flex-col items-center justify-center transition-opacity duration-300">
+        <i class="fa-solid fa-circle-notch fa-spin text-5xl text-indigo-600 mb-4"></i>
+        <p class="font-bold text-gray-700 text-lg">กำลังเชื่อมต่อฐานข้อมูล...</p>
+        <p class="text-sm text-gray-500 mt-2">กรุณารอสักครู่ (Google Sheets Sync)</p>
     </div>
 
     <!-- DASHBOARD VIEW -->
-    <div id="view-dashboard" class="block animate-[fadeIn_0.3s_ease-in-out]">
+    <div id="view-dashboard" class="block max-w-7xl mx-auto px-4 md:px-8 mt-6">
+        
+        <!-- Stats Cards -->
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+            <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center"><i class="fa-solid fa-users text-blue-500 mr-2"></i>ลูกค้าทั้งหมด</h3>
+                <div class="text-3xl font-black mt-2 text-gray-800" id="total-customers">0</div>
             </div>
+            <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center"><i class="fa-solid fa-coins text-emerald-500 mr-2"></i>ยอดประเมินรวม (บ.)</h3>
+                <div class="text-3xl font-black mt-2 text-gray-800" id="total-sales">0</div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm p-5 border border-gray-100 col-span-2">
+                <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center"><i class="fa-solid fa-chess-knight text-purple-500 mr-2"></i>ปะทะคู่แข่งบ่อยสุด</h3>
+                <div class="text-xl md:text-2xl font-bold mt-2 text-gray-800 truncate" id="top-competitor">-</div>
+            </div>
+        </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden border">
-                    <div class="p-3 border-b bg-gray-50 font-bold"><i class="fa-solid fa-map text-red-500 mr-2"></i> แผนที่</div>
-                    <div id="map" class="w-full h-[55vh] z-10"></div>
+        <!-- Map & Chart Section -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+            <div class="lg:col-span-2 bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100">
+                <div class="px-5 py-4 border-b border-gray-50 bg-gray-50/50 flex items-center">
+                    <h2 class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-map-location-dot text-indigo-500 mr-2"></i> แผนที่สมรภูมิการค้า</h2>
                 </div>
-                <div class="flex flex-col gap-6">
-                    <div class="bg-white p-4 rounded-xl shadow-sm border"><h2 class="text-sm font-bold border-b pb-2 mb-2"><i class="fa-solid fa-chart-pie text-purple-500 mr-2"></i> สัดส่วนลูกค้าตามคู่แข่ง</h2><div class="h-[200px]"><canvas id="marketShareChart"></canvas></div></div>
+                <div id="map" class="w-full h-[55vh] z-10"></div>
+            </div>
+            <div class="bg-white rounded-2xl shadow-sm border border-gray-100 flex flex-col">
+                <div class="px-5 py-4 border-b border-gray-50 bg-gray-50/50">
+                    <h2 class="text-sm font-bold text-gray-700"><i class="fa-solid fa-chart-pie text-purple-500 mr-2"></i> สัดส่วนลูกค้าตามคู่แข่ง</h2>
+                </div>
+                <div class="flex-grow p-4 flex items-center justify-center min-h-[250px]">
+                    <canvas id="marketShareChart"></canvas>
                 </div>
             </div>
+        </div>
 
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8 border">
-                <div class="px-4 py-3 border-b bg-gray-50 font-bold text-sm">ข้อมูลลูกค้า</div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-white"><tr><th class="px-4 py-2 text-left text-xs text-gray-500">ชื่อลูกค้า</th><th class="px-4 py-2 text-right text-xs text-gray-500">ยอดรวม(บาท)</th><th class="px-4 py-2 text-center text-xs text-gray-500">แอคชัน</th></tr></thead>
-                        <tbody id="data-table-body" class="divide-y divide-gray-100"></tbody>
-                    </table>
-                </div>
+        <!-- Data Table Section -->
+        <div class="bg-white rounded-2xl shadow-sm overflow-hidden border border-gray-100 mb-8">
+            <div class="px-5 py-4 border-b border-gray-50 bg-gray-50/50 flex justify-between items-center">
+                <h2 class="font-bold text-gray-700 text-sm">ข้อมูลลูกค้ารายตัว</h2>
+                <span class="text-xs text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full font-medium" id="table-count">0 รายการ</span>
+            </div>
+            <div class="overflow-x-auto">
+                <table class="min-w-full divide-y divide-gray-100">
+                    <thead class="bg-gray-50 text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                        <tr>
+                            <th class="px-5 py-3 text-left">ชื่อลูกค้า / ร้านค้า</th>
+                            <th class="px-5 py-3 text-right">ยอดประเมินรวม (บาท)</th>
+                            <th class="px-5 py-3 text-center">วิเคราะห์เชิงลึก</th>
+                        </tr>
+                    </thead>
+                    <tbody id="data-table-body" class="bg-white divide-y divide-gray-50"></tbody>
+                </table>
             </div>
         </div>
     </div>
 
-    <!-- Modal เปรียบเทียบสินค้า -->
-    <div id="customerModal" class="fixed inset-0 z-[9999] hidden flex-col justify-end md:justify-center items-center bg-black/60 opacity-0 transition-opacity">
-        <div class="bg-white w-full max-w-4xl md:rounded-2xl rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col">
-            <div class="px-6 py-4 border-b flex justify-between items-center bg-gray-50 rounded-t-3xl md:rounded-t-2xl">
-                <h2 class="text-lg font-bold text-blue-800" id="modal-cust-name"></h2>
-                <button onclick="closeCustomerModal()" class="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center"><i class="fa-solid fa-xmark"></i></button>
-            </div>
-            <div class="p-6 overflow-y-auto bg-gray-100">
-                <h3 class="font-bold text-gray-800 mb-3"><i class="fa-solid fa-scale-balanced text-gray-500 mr-2"></i> วิเคราะห์เจาะลึกรายหมวดหมู่ (พร้อมหน่วยวัด)</h3>
-                <div class="overflow-x-auto bg-white rounded-lg border">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50"><tr>
-                            <th class="px-4 py-2 text-left text-xs font-bold text-gray-600">หมวดหมู่ (สินค้า)</th>
-                            <th class="px-4 py-2 text-right text-xs font-bold text-blue-700 bg-blue-50">ยอดขายเรา</th>
-                            <th class="px-4 py-2 text-right text-xs font-bold text-red-700 bg-red-50">ยอดคู่แข่ง</th>
-                        </tr></thead>
-                        <tbody id="modal-product-comparison" class="divide-y divide-gray-100"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- DATA ENTRY VIEW -->
-    <div id="view-data" class="hidden max-w-7xl mx-auto px-4 md:px-8 mt-6">
-        <div class="bg-white p-6 rounded-xl shadow-sm border">
-            <h3 class="font-bold border-b pb-2 mb-4"><i class="fa-solid fa-pen-to-square text-blue-600 mr-2"></i>บันทึกข้อมูลลูกค้า & ยอดขาย</h3>
-            <form id="add-data-form" class="space-y-6">
-                <!-- ข้อมูลลูกค้า -->
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 bg-gray-50 p-4 rounded-lg border">
-                    <div><label class="block text-xs font-bold mb-1">ชื่อลูกค้า *</label><input type="text" id="form-name" required class="w-full border rounded p-2 text-sm"></div>
-                    <div><label class="block text-xs font-bold mb-1">ยอดขายรวมทั้งร้านประเมิน (บาท) *</label><input type="number" id="form-sales" required class="w-full border rounded p-2 text-sm bg-blue-50"></div>
-                    <div><label class="block text-xs font-bold mb-1">ละติจูด (Lat) *</label><input type="number" id="form-lat" step="any" required class="w-full border rounded p-2 text-sm"></div>
-                    <div><label class="block text-xs font-bold mb-1">ลองจิจูด (Lng) *</label><input type="number" id="form-lng" step="any" required class="w-full border rounded p-2 text-sm"></div>
-                    <div class="md:col-span-2">
-                        <label class="block text-xs font-bold mb-2 text-purple-700">คู่แข่งที่ปะทะ (เลือกได้หลายเจ้า)</label>
-                        <div id="checkbox-competitors" class="grid grid-cols-2 lg:grid-cols-4 gap-2"></div>
+    <!-- CUSTOMER MODAL (Deep Dive Analysis) -->
+    <div id="customerModal" class="fixed inset-0 z-[9999] hidden flex-col justify-end md:justify-center items-center bg-gray-900/60 backdrop-blur-sm transition-all">
+        <div class="bg-white w-full max-w-4xl md:rounded-2xl rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col animate-[fadeIn_0.2s_ease-out]">
+            
+            <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-start bg-gray-50/80 rounded-t-3xl md:rounded-t-2xl">
+                <div class="flex items-center gap-4">
+                    <div class="w-12 h-12 rounded-xl bg-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner">
+                        <i class="fa-solid fa-store text-xl"></i>
                     </div>
-                </div>
-
-                <!-- ข้อมูลสินค้า (Dynamic Rows) -->
-                <div class="border rounded-lg p-4">
-                    <div class="flex justify-between items-center mb-3">
-                        <label class="block text-sm font-bold text-green-700"><i class="fa-solid fa-boxes-stacked mr-1"></i> รายการสินค้าที่เสนอขาย</label>
-                        <button type="button" onclick="addProductRow()" class="bg-green-100 text-green-700 px-3 py-1 rounded text-xs font-bold border border-green-300 hover:bg-green-200"><i class="fa-solid fa-plus"></i> เพิ่มรายการ</button>
-                    </div>
-                    
-        <div class="sticky top-14 z-40 glass-header px-4 py-3 shadow-sm w-full">
-            <div class="max-w-7xl mx-auto flex flex-col md:flex-row gap-3 justify-between items-center">
-                <div class="flex gap-2 w-full md:w-auto">
-                    <div class="relative w-full md:w-48">
-                        <i class="fa-solid fa-filter absolute left-3 top-2.5 text-gray-400 text-xs"></i>
-                        <select id="competitor-filter" class="w-full text-xs border border-gray-300 rounded-lg pl-8 pr-2 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none cursor-pointer"><option value="ALL">คู่แข่ง (ทั้งหมด)</option></select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 top-2.5 text-gray-400 text-xs pointer-events-none"></i>
-                    </div>
-                    <div class="relative w-full md:w-48">
-                        <i class="fa-solid fa-layer-group absolute left-3 top-2.5 text-gray-400 text-xs"></i>
-                        <select id="category-filter" class="w-full text-xs border border-gray-300 rounded-lg pl-8 pr-2 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none cursor-pointer"><option value="ALL">หมวดหมู่ (ทั้งหมด)</option></select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 top-2.5 text-gray-400 text-xs pointer-events-none"></i>
-                    </div>
-                </div>
-                <div class="relative w-full md:w-64">
-                    <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-gray-400 text-xs"></i>
-                    <select id="customer-navigator" class="w-full text-xs font-bold border border-gray-300 rounded-lg pl-8 pr-2 py-2 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none appearance-none cursor-pointer text-indigo-700"><option value="" disabled selected>ค้นหาลูกค้า (ซูมแผนที่)</option></select>
-                    <i class="fa-solid fa-chevron-down absolute right-3 top-2.5 text-gray-400 text-xs pointer-events-none"></i>
-                </div>
-                <button id="reset-view-btn" class="hidden w-full md:w-auto text-xs bg-gray-100 hover:bg-gray-200 px-4 py-2 rounded-lg border font-medium transition-colors">ล้างตัวกรอง</button>
-            </div>
-        </div>
-
-        <div class="max-w-7xl mx-auto px-4 md:px-8 mt-6">
-            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-                <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 relative overflow-hidden group hover:shadow-md transition-shadow">
-                    <div class="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500"><i class="fa-solid fa-users text-8xl"></i></div>
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center"><span class="w-2 h-2 rounded-full bg-blue-500 mr-2"></span>ลูกค้าทั้งหมด</h3>
-                    <div class="text-3xl font-black mt-2 text-gray-800" id="total-customers">0</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 relative overflow-hidden group hover:shadow-md transition-shadow">
-                    <div class="absolute -right-4 -bottom-4 opacity-5 group-hover:scale-110 transition-transform duration-500"><i class="fa-solid fa-coins text-8xl"></i></div>
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center"><span class="w-2 h-2 rounded-full bg-emerald-500 mr-2"></span>ยอดประเมินรวม (บาท)</h3>
-                    <div class="text-3xl font-black mt-2 text-gray-800" id="total-sales">0</div>
-                </div>
-                <div class="bg-white rounded-xl shadow-sm p-5 border border-gray-100 col-span-2 relative overflow-hidden group hover:shadow-md transition-shadow">
-                    <div class="absolute right-0 bottom-0 opacity-5 group-hover:scale-110 transition-transform duration-500 translate-x-4 translate-y-4"><i class="fa-solid fa-chess-knight text-8xl"></i></div>
-                    <h3 class="text-xs font-bold text-gray-500 uppercase tracking-wide flex items-center"><span class="w-2 h-2 rounded-full bg-purple-500 mr-2"></span>ปะทะคู่แข่งบ่อยสุด</h3>
-                    <div class="text-2xl font-bold mt-2 text-gray-800 truncate" id="top-competitor">-</div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
-                <div class="lg:col-span-2 bg-white rounded-xl shadow-sm overflow-hidden border border-gray-200">
-                    <div class="px-5 py-3 border-b border-gray-100 bg-gray-50/50 flex items-center justify-between">
-                        <div class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-map-location-dot text-indigo-500 mr-2"></i> แผนที่สมรภูมิ</div>
-                    </div>
-                    <div id="map" class="w-full h-[55vh] z-10"></div>
-                </div>
-                <div class="flex flex-col gap-6">
-                    <div class="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex flex-col h-full">
-                        <h2 class="text-sm font-bold text-gray-700 mb-4 flex items-center"><i class="fa-solid fa-chart-doughnut text-purple-500 mr-2"></i> สัดส่วนลูกค้าตามคู่แข่ง</h2>
-                        <div class="flex-grow flex items-center justify-center min-h-[250px]"><canvas id="marketShareChart"></canvas></div>
-                    </div>
-                </div>
-            </div>
-
-            <div class="bg-white rounded-xl shadow-sm overflow-hidden mb-8 border border-gray-200">
-                <div class="px-5 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
-                    <div class="font-bold text-gray-700 text-sm">ข้อมูลลูกค้า</div>
-                    <span class="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full" id="table-count">0 รายการ</span>
-                </div>
-                <div class="overflow-x-auto">
-                    <table class="min-w-full divide-y divide-gray-200">
-                        <thead class="bg-gray-50">
-                            <tr>
-                                <th class="px-5 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">ชื่อลูกค้า</th>
-                                <th class="px-5 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">ยอดรวม(บาท)</th>
-                                <th class="px-5 py-3 text-center text-xs font-semibold text-gray-500 uppercase tracking-wider">รายละเอียด</th>
-                            </tr>
-                        </thead>
-                        <tbody id="data-table-body" class="bg-white divide-y divide-gray-100"></tbody>
-                    </table>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <div id="customerModal" class="fixed inset-0 z-[9999] hidden flex-col justify-end md:justify-center items-center bg-gray-900/60 backdrop-blur-sm opacity-0 transition-all duration-300">
-        <div class="bg-white w-full max-w-4xl md:rounded-2xl rounded-t-3xl shadow-2xl max-h-[90vh] flex flex-col transform transition-transform duration-300 translate-y-full md:translate-y-4 md:scale-95" id="customerModalContent">
-            <div class="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-gray-50/80 rounded-t-3xl md:rounded-t-2xl">
-                <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-full bg-indigo-100 flex items-center justify-center text-indigo-600"><i class="fa-solid fa-store"></i></div>
                     <div>
-                        <h2 class="text-lg font-bold text-gray-800 leading-tight" id="modal-cust-name"></h2>
-                        <div class="text-xs text-gray-500 flex items-center gap-2 mt-1">
-                            <i class="fa-solid fa-location-dot"></i> <span id="modal-cust-coords">18.xx, 98.xx</span>
+                        <h2 class="text-xl font-bold text-gray-800 leading-tight" id="modal-cust-name">ชื่อร้านค้า</h2>
+                        <div class="text-xs text-gray-500 mt-1 flex gap-3">
+                            <span><i class="fa-solid fa-location-dot mr-1"></i> <span id="modal-cust-coords">-</span></span>
+                            <span><i class="fa-solid fa-crosshairs mr-1"></i> ปะทะ: <span id="modal-cust-comp" class="font-bold text-gray-700">-</span></span>
                         </div>
                     </div>
                 </div>
                 <button onclick="closeCustomerModal()" class="w-8 h-8 rounded-full bg-gray-200 hover:bg-gray-300 text-gray-600 flex items-center justify-center transition-colors"><i class="fa-solid fa-xmark"></i></button>
             </div>
-            <div class="p-6 overflow-y-auto bg-gray-50/50 flex-grow">
+            
+            <div class="p-4 md:p-6 overflow-y-auto bg-gray-50/30 flex-grow">
                 <div class="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                    <div class="p-4 border-b border-gray-100 bg-gray-50 flex items-center justify-between">
-                        <h3 class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-scale-balanced text-indigo-500 mr-2"></i> วิเคราะห์ยอดขายรายหมวดหมู่</h3>
+                    <div class="p-4 border-b border-gray-100 bg-gray-50 flex items-center">
+                        <h3 class="font-bold text-gray-700 text-sm"><i class="fa-solid fa-scale-balanced text-indigo-500 mr-2"></i> วิเคราะห์เปรียบเทียบยอดขาย (Product Level)</h3>
                     </div>
                     <div class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-gray-200">
+                        <table class="min-w-full divide-y divide-gray-100">
                             <thead>
-                                <tr>
-                                    <th class="px-5 py-3 text-left text-xs font-bold text-gray-600 bg-gray-50">รายการสินค้า / หมวดหมู่</th>
-                                    <th class="px-5 py-3 text-right text-xs font-bold text-indigo-700 bg-indigo-50/50 w-1/3">ยอดขายเรา</th>
-                                    <th class="px-5 py-3 text-right text-xs font-bold text-rose-700 bg-rose-50/50 w-1/3">ยอดคู่แข่ง</th>
+                                <tr class="text-[10px] uppercase font-bold text-gray-500 tracking-wider">
+                                    <th class="px-5 py-3 text-left bg-gray-50">สินค้า (หมวดหมู่)</th>
+                                    <th class="px-5 py-3 text-right text-indigo-700 bg-indigo-50/50 w-1/3">ยอดฝั่งเรา (Our)</th>
+                                    <th class="px-5 py-3 text-right text-rose-700 bg-rose-50/50 w-1/3">ยอดคู่แข่ง (Comp)</th>
                                 </tr>
                             </thead>
-                            <tbody id="modal-product-comparison" class="divide-y divide-gray-100 bg-white"></tbody>
+                            <tbody id="modal-product-comparison" class="divide-y divide-gray-50 bg-white"></tbody>
                         </table>
                     </div>
                 </div>
@@ -237,160 +170,134 @@
     </div>
 
     <!-- DATA ENTRY VIEW -->
-    <div id="view-data" class="hidden animate-[fadeIn_0.3s_ease-in-out]">
-        <div class="bg-indigo-900 h-32 w-full absolute top-14 left-0 -z-10 hidden md:block"></div>
-        <div class="max-w-5xl mx-auto px-4 md:px-8 mt-4 md:mt-8 relative z-0">
-            <div class="bg-white p-6 md:p-8 rounded-2xl shadow-lg border border-gray-100">
-                
-                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 pb-4 border-b border-gray-100 gap-4">
-                    <div>
-                        <h2 class="text-xl font-bold text-gray-800 flex items-center"><i class="fa-solid fa-file-signature text-indigo-500 mr-3"></i>บันทึกข้อมูลการตลาด</h2>
-                        <p class="text-xs text-gray-500 mt-1 ml-8">เพิ่มข้อมูลลูกค้าใหม่ ประเมินยอดขาย และวิเคราะห์จุดแข็ง-จุดอ่อน</p>
-                    </div>
-                    <button type="button" onclick="document.getElementById('add-data-form').reset(); document.getElementById('product-rows-container').innerHTML=''; addProductRow();" class="text-xs text-indigo-600 hover:text-indigo-800 bg-indigo-50 hover:bg-indigo-100 px-3 py-1.5 rounded-lg transition-colors font-medium self-end md:self-auto"><i class="fa-solid fa-rotate-right mr-1"></i> ล้างฟอร์ม</button>
+    <div id="view-data" class="hidden max-w-5xl mx-auto px-4 md:px-8 mt-6">
+        <div class="bg-white p-6 md:p-8 rounded-2xl shadow-sm border border-gray-200">
+            
+            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 pb-4 border-b border-gray-100 gap-4">
+                <div>
+                    <h2 class="text-xl font-bold text-gray-800 flex items-center"><i class="fa-solid fa-file-signature text-indigo-500 mr-3"></i>บันทึกข้อมูลการตลาดใหม่</h2>
+                    <p class="text-xs text-gray-500 mt-1 ml-8">เพิ่มข้อมูลลูกค้า พิกัดร้านค้า และยอดขายแยกตามรายการสินค้าได้อย่างอิสระ</p>
                 </div>
+            </div>
 
-                <form id="add-data-form" class="space-y-8">
-                    <div class="bg-gray-50/50 rounded-xl p-5 border border-gray-200">
-                        <h3 class="text-sm font-bold text-gray-700 mb-4 flex items-center"><span class="bg-indigo-100 text-indigo-600 w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">1</span> ข้อมูลร้านค้า / ลูกค้า</h3>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5">ชื่อลูกค้า / ร้านค้า <span class="text-red-500">*</span></label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-store text-gray-400 text-xs"></i></div>
-                                    <input type="text" id="form-name" required placeholder="เช่น บจก. ลานนาเจริญทรัพย์" class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-white">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5">ยอดขายรวมประเมิน (บาท/ปี) <span class="text-red-500">*</span></label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-baht-sign text-gray-400 text-xs"></i></div>
-                                    <input type="number" id="form-sales" required placeholder="ตัวเลขประเมินรวมทั้งร้าน" class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-white">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5">ละติจูด (Latitude) <span class="text-red-500">*</span></label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-location-dot text-gray-400 text-xs"></i></div>
-                                    <input type="number" id="form-lat" step="any" required placeholder="เช่น 18.7883" class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-white font-mono text-gray-600">
-                                </div>
-                            </div>
-                            <div>
-                                <label class="block text-xs font-bold text-gray-700 mb-1.5">ลองจิจูด (Longitude) <span class="text-red-500">*</span></label>
-                                <div class="relative">
-                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none"><i class="fa-solid fa-location-dot text-gray-400 text-xs"></i></div>
-                                    <input type="number" id="form-lng" step="any" required placeholder="เช่น 98.9853" class="w-full border border-gray-300 rounded-lg pl-9 pr-3 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none transition-shadow bg-white font-mono text-gray-600">
-                                </div>
-                            </div>
-                            
-                            <!-- Competitors Checkboxes -->
-                            <div class="md:col-span-2 mt-2">
-                                <label class="block text-xs font-bold text-gray-700 mb-2">คู่แข่งที่กำลังปะทะอยู่ <span class="text-gray-400 font-normal">(เลือกได้หลายราย)</span></label>
-                                <div id="checkbox-competitors" class="flex flex-wrap gap-2">
-                                    <!-- Dynamic Checkboxes Go Here -->
-                                </div>
-                            </div>
+            <form id="add-data-form" class="space-y-8">
+                
+                <!-- ส่วนที่ 1: ข้อมูลร้านค้า -->
+                <div class="bg-gray-50 rounded-xl p-5 border border-gray-200">
+                    <h3 class="text-sm font-bold text-gray-700 mb-4 flex items-center">
+                        <span class="bg-indigo-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">1</span> 
+                        ข้อมูลร้านค้าเป้าหมาย
+                    </h3>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-5">
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1.5">ชื่อลูกค้า / ร้านค้า <span class="text-red-500">*</span></label>
+                            <input type="text" id="form-name" required placeholder="เช่น หจก. นิมมานค้าวัสดุ" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white">
                         </div>
-                    </div>
-
-                    <div class="border border-indigo-100 rounded-xl overflow-hidden bg-white shadow-sm relative">
-                        <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
-                        <div class="p-5 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3">
-                            <div>
-                                <h3 class="text-sm font-bold text-gray-800 flex items-center"><span class="bg-indigo-100 text-indigo-600 w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">2</span> รายละเอียดสินค้าที่เสนอขาย</h3>
-                                <p class="text-[10px] text-gray-500 mt-1 ml-8">เพิ่มข้อมูลแยกตามรายสินค้า ระบุฝั่งและยอดขาย เพื่อวิเคราะห์เชิงลึก</p>
-                            </div>
-                            <button type="button" onclick="addProductRow()" class="w-full sm:w-auto bg-white hover:bg-indigo-50 text-indigo-600 px-4 py-2 rounded-lg text-xs font-bold border border-indigo-200 shadow-sm transition-all flex items-center justify-center gap-2"><i class="fa-solid fa-plus-circle text-indigo-500"></i> เพิ่มรายการสินค้า</button>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1.5">ยอดประเมินรวมทั้งร้าน (บาท/ปี) <span class="text-red-500">*</span></label>
+                            <input type="number" id="form-sales" required placeholder="ระบุตัวเลขรวม" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1.5">ละติจูด (Lat) <span class="text-red-500">*</span></label>
+                            <input type="number" id="form-lat" step="any" required placeholder="18.xxxx" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white font-mono">
+                        </div>
+                        <div>
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-1.5">ลองจิจูด (Lng) <span class="text-red-500">*</span></label>
+                            <input type="number" id="form-lng" step="any" required placeholder="98.xxxx" class="w-full border border-gray-300 rounded-lg px-4 py-2.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none bg-white font-mono">
                         </div>
                         
-                        <div class="p-4 md:p-5">
-                            <!-- Table Headers (Desktop only) -->
-                            <div class="hidden md:grid grid-cols-12 gap-3 mb-3 px-3 text-[10px] font-bold text-gray-500 uppercase tracking-wider">
-                                <div class="col-span-3">ระบุชื่อสินค้า (พิมพ์อิสระ)</div>
-                                <div class="col-span-3">จัดกลุ่มหมวดหมู่ (สำคัญ)</div>
-                                <div class="col-span-2">เจ้าของยอดขาย</div>
-                                <div class="col-span-3 text-right pr-2">จำนวน/ยอดขาย</div>
-                                <div class="col-span-1"></div>
-                            </div>
-
-                            <div id="product-rows-container" class="space-y-4 md:space-y-2">
-                                <!-- แถวสินค้าจะถูกเพิ่มที่นี่ -->
-                            </div>
-                            
-                            <div class="mt-4 pt-4 border-t border-gray-100 flex justify-center">
-                                <button type="button" onclick="addProductRow()" class="text-xs text-gray-500 hover:text-indigo-600 bg-gray-50 hover:bg-indigo-50 px-4 py-2 rounded-lg transition-colors border border-dashed border-gray-300 w-full flex justify-center items-center gap-2"><i class="fa-solid fa-plus"></i> กดเพิ่มรายการถัดไป</button>
+                        <div class="md:col-span-2 mt-2">
+                            <label class="block text-[11px] font-bold text-gray-600 uppercase mb-2">คู่แข่งที่กำลังปะทะอยู่ (เลือกได้หลายราย)</label>
+                            <div id="checkbox-competitors" class="flex flex-wrap gap-2">
+                                <!-- Dynamic Checkboxes render here -->
                             </div>
                         </div>
                     </div>
+                </div>
 
-                    <div class="pt-6 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4 sticky bottom-0 bg-white pb-6 z-10">
-                        <div id="form-status" class="text-sm px-4 py-2 rounded-lg w-full md:w-auto text-center hidden"></div>
-                        <button type="submit" id="btn-submit" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl shadow-[0_4px_14px_0_rgba(79,70,229,0.39)] hover:shadow-[0_6px_20px_rgba(79,70,229,0.23)] hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 text-sm"><i class="fa-solid fa-cloud-arrow-up"></i> บันทึกข้อมูลเข้าระบบ</button>
+                <!-- ส่วนที่ 2: รายการสินค้า (Dynamic Rows) -->
+                <div class="border border-indigo-100 rounded-xl bg-white shadow-sm overflow-hidden relative">
+                    <div class="absolute top-0 left-0 w-1 h-full bg-indigo-500"></div>
+                    <div class="p-4 border-b border-gray-100 bg-gray-50 flex flex-col sm:flex-row justify-between items-center gap-3">
+                        <h3 class="text-sm font-bold text-gray-800 flex items-center">
+                            <span class="bg-indigo-600 text-white w-6 h-6 rounded-full inline-flex items-center justify-center text-xs mr-2">2</span> 
+                            รายการสินค้าที่ต้องการวิเคราะห์
+                        </h3>
+                        <button type="button" onclick="addProductRow()" class="w-full sm:w-auto bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-4 py-2 rounded-lg text-xs font-bold border border-indigo-200 transition-colors flex items-center justify-center gap-2">
+                            <i class="fa-solid fa-plus"></i> เพิ่มรายการสินค้า
+                        </button>
                     </div>
-                </form>
-            </div>
-        </div>
-    </div>
-
-    <script>
-        // 🔴 ใส่ Web App URL ของคุณที่นี่ 🔴
-        const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwPtajrdyAbPI_iV003M47LtrFAInEZTL5WujXvRqBCe8PrkGv0Z4h8a0zup5h4wIkE/exec";
-
-                    <div class="hidden md:grid grid-cols-12 gap-2 mb-2 px-2 text-[10px] font-bold text-gray-500 uppercase">
-                        <div class="col-span-3">หมวดหมู่หลัก</div>
-                        <div class="col-span-3">ชื่อสินค้า (ระบุ/ไม่ระบุ)</div>
-                        <div class="col-span-2 text-right">ปริมาณที่เราขายได้</div>
-                        <div class="col-span-2 text-right">ปริมาณที่คู่แข่งขายได้</div>
-                        <div class="col-span-2"></div>
-                    </div>
-
-                    <div id="product-rows-container" class="space-y-3">
-                        <!-- แถวจะถูกเพิ่มที่นี่ -->
+                    
+                    <div class="p-4 bg-gray-50/30">
+                        <div id="product-rows-container" class="space-y-3">
+                            <!-- แถวสินค้าจะถูกฉีดเข้ามาที่นี่ด้วย JS -->
+                        </div>
                     </div>
                 </div>
 
-                <div class="pt-4 border-t flex justify-between items-center">
-                    <span id="form-status" class="text-sm"></span>
-                    <button type="submit" id="btn-submit" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded-lg shadow-md"><i class="fa-solid fa-save mr-2"></i> บันทึกข้อมูล</button>
+                <div class="pt-6 border-t border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
+                    <div id="form-status" class="text-sm px-4 py-2 rounded-lg w-full md:w-auto text-center hidden font-medium"></div>
+                    <button type="submit" id="btn-submit" class="w-full md:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-3 px-8 rounded-xl shadow-lg hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center justify-center gap-2 text-sm">
+                        <i class="fa-solid fa-cloud-arrow-up"></i> บันทึกข้อมูลเข้าระบบ
+                    </button>
                 </div>
             </form>
         </div>
     </div>
 
     <script>
-        // 🔴 ใส่ Web App URL ของคุณที่นี่ 🔴
+        // 🔴🔴🔴 สำคัญ: เปลี่ยน URL เป็นอันใหม่ที่ได้จากการ Deploy 🔴🔴🔴
         const GAS_WEB_APP_URL = "https://script.google.com/macros/s/AKfycbwPtajrdyAbPI_iV003M47LtrFAInEZTL5WujXvRqBCe8PrkGv0Z4h8a0zup5h4wIkE/exec";
 
-        let map, customerLayer, compLayer;
+        let map, customerLayer;
         let globalData = { customers:[], categories:[], transactions:[], competitors:[], company:{} };
-        let categoryOptionsHTML = '';
+        let categoryOptionsHTML = '<option value="" disabled selected>-- เลือกหมวดหมู่ --</option>';
+        let myChart = null;
 
+        // Initialize App
         document.addEventListener('DOMContentLoaded', () => {
-            fetch(GAS_WEB_APP_URL).then(r=>r.json()).then(data => {
+            fetch(GAS_WEB_APP_URL)
+            .then(res => res.json())
+            .then(data => {
                 globalData = data;
                 
-                // สร้าง Category Dropdown Options
-                categoryOptionsHTML = '<option value="" disabled selected>-- เลือกหมวดหมู่ --</option>';
-                data.categories.forEach(c => {
-                    categoryOptionsHTML += `<option value="${c.name}" data-unit="${c.unit}">${c.name}</option>`;
-                });
+                // 1. สร้าง Dropdown หมวดหมู่ (ให้เลือกตอนกดเพิ่มสินค้า)
+                if (data.categories && data.categories.length > 0) {
+                    data.categories.forEach(c => {
+                        categoryOptionsHTML += `<option value="${c.name}" data-unit="${c.unit}">${c.name}</option>`;
+                    });
+                } else {
+                    categoryOptionsHTML += `<option value="ทั่วไป" data-unit="หน่วย">ทั่วไป</option>`;
+                }
 
-                // สร้าง Competitor Checkboxes
+                // 2. สร้าง Checkbox สำหรับคู่แข่ง
                 let compHtml = '';
-                [...new Set(data.competitors.map(c=>c.CompetitorName))].forEach(c => {
-                    compHtml += `<label class="checkbox-container-purple cursor-pointer"><input type="checkbox" value="${c}" class="comp-cb sr-only"><div class="px-2 py-1 text-[10px] border rounded text-center">${c}</div></label>`;
-                });
+                if(data.competitors && data.competitors.length > 0) {
+                    const uniqueComps = [...new Set(data.competitors.map(c => c.CompetitorName))];
+                    uniqueComps.forEach(c => {
+                        compHtml += `
+                        <label class="checkbox-comp cursor-pointer">
+                            <input type="checkbox" value="${c}" class="comp-cb sr-only">
+                            <div class="px-3 py-1.5 text-xs font-medium border border-gray-300 rounded-full text-gray-600 transition-all bg-white hover:bg-gray-50">${c}</div>
+                        </label>`;
+                    });
+                }
                 document.getElementById('checkbox-competitors').innerHTML = compHtml;
 
-                // เพิ่มแถวสินค้าแถวแรกอัตโนมัติ
+                // เพิ่มแถวสินค้าแรกอัตโนมัติ
                 addProductRow();
 
+                // ปิดฉาก Loading และวาด Dashboard
+                document.getElementById('loading').style.display = 'none';
                 initMap();
                 updateDashboard();
-                document.getElementById('loading').style.display = 'none';
+            })
+            .catch(err => {
+                document.getElementById('loading').innerHTML = `<div class="text-red-500 font-bold text-center"><i class="fa-solid fa-circle-exclamation text-4xl mb-3"></i><br>เกิดข้อผิดพลาดในการโหลดข้อมูล<br><span class="text-sm font-normal">${err.message}</span></div>`;
             });
         });
 
+        // Tab Switcher
         function switchTab(tab) {
             const dashBtn = document.getElementById('btn-tab-dashboard');
             const dataBtn = document.getElementById('btn-tab-data');
@@ -409,277 +316,316 @@
             }
         }
 
-        function updateDashboard() {
-            const tbody = document.getElementById('data-table-body'); tbody.innerHTML = '';
-            customerLayer.clearLayers();
-            let totalSales = 0;
+        function initMap() {
+            const hq = globalData.company;
+            const hqLat = hq.lat || 18.7953;
+            const hqLng = hq.lng || 98.9620;
+            
+            map = L.map('map').setView([hqLat, hqLng], 12);
+            L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+                attribution: '&copy; OpenStreetMap'
+            }).addTo(map);
 
-            globalData.customers.forEach(c => {
-                totalSales += parseFloat(c.Sales2026_Baht) || 0;
-                
+            // ปักหมุด HQ (ดาว)
+            const hqIcon = L.divIcon({
+                className: '',
+                html: `<div style="background:#1e3a8a;color:#fbbf24;width:32px;height:32px;border-radius:50%;border:3px solid white;box-shadow:0 3px 6px rgba(0,0,0,0.3);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-star text-sm"></i></div>`,
+                iconSize: [32, 32],
+                iconAnchor: [16, 16]
+            });
+            L.marker([hqLat, hqLng], {icon: hqIcon}).addTo(map).bindPopup(`<b>${hq.name || 'สำนักงานใหญ่'}</b>`).openPopup();
+
+            customerLayer = L.layerGroup().addTo(map);
+        }
+
         function updateDashboard() {
-            const tbody = document.getElementById('data-table-body'); tbody.innerHTML = '';
+            const tbody = document.getElementById('data-table-body'); 
+            tbody.innerHTML = '';
             customerLayer.clearLayers();
+            
             let totalSales = 0;
             let counter = 0;
+            let compCounts = {}; // นับว่าเจอคู่แข่งไหนบ่อยสุด
 
             globalData.customers.forEach(c => {
-                totalSales += parseFloat(c.Sales2026_Baht) || 0;
+                // ข้ามคนที่ไม่มีพิกัด
+                if(!c.Latitude || !c.Longitude) return;
+
+                const sales = parseFloat(c.Sales2026 || 0);
+                totalSales += sales;
                 counter++;
                 
-                // ตารางลูกค้า (ปรับ UI)
+                // นับคู่แข่ง
+                if (c.MainCompetitor) {
+                    const comps = c.MainCompetitor.split(',').map(s=>s.trim()).filter(s=>s!=="");
+                    comps.forEach(cp => {
+                        compCounts[cp] = (compCounts[cp] || 0) + 1;
+                    });
+                }
+                
+                // สร้างแถวตารางลูกค้า
                 tbody.innerHTML += `
                 <tr class="hover:bg-gray-50 transition-colors">
-                    <td class="px-5 py-3 border-b border-gray-100 text-sm font-semibold text-gray-800">
+                    <td class="px-5 py-3 border-b border-gray-100">
                         <div class="flex items-center gap-3">
-                            <div class="w-8 h-8 rounded-full bg-indigo-50 text-indigo-500 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-store text-[10px]"></i></div>
-                            ${c.CustomerName}
+                            <div class="w-8 h-8 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center flex-shrink-0"><i class="fa-solid fa-store text-xs"></i></div>
+                            <span class="text-sm font-semibold text-gray-800">${c.CustomerName}</span>
                         </div>
                     </td>
-                    <td class="px-5 py-3 border-b border-gray-100 text-sm text-right font-medium text-emerald-600">${parseFloat(c.Sales2026_Baht||0).toLocaleString()}</td>
+                    <td class="px-5 py-3 border-b border-gray-100 text-sm text-right font-bold text-gray-600">${sales.toLocaleString()}</td>
                     <td class="px-5 py-3 border-b border-gray-100 text-center">
-                        <button onclick="openModal('${c.ID}')" class="bg-white border border-gray-200 text-gray-600 hover:text-indigo-600 hover:border-indigo-300 text-xs px-3 py-1.5 rounded-lg shadow-sm transition-colors font-medium">ดูข้อมูล</button>
+                        <button onclick="openModal('${c.ID}')" class="bg-white border border-gray-200 text-gray-600 hover:text-indigo-600 hover:bg-indigo-50 text-xs px-3 py-1.5 rounded-lg shadow-sm transition-colors font-medium">ดูข้อมูลสินค้า</button>
                     </td>
                 </tr>`;
 
-                // แผนที่ (ปรับสีหมุดเล็กน้อย)
-                const icon = L.divIcon({className:'', html:`<div style="background:#4f46e5;color:white;width:28px;height:28px;border-radius:50%;border:2px solid white;box-shadow: 0 2px 4px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-store text-xs"></i></div>`, iconSize:[28,28], iconAnchor:[14,14]});
+                // ปักหมุดบนแผนที่
+                const icon = L.divIcon({
+                    className: '', 
+                    html: `<div style="background:#4f46e5;color:white;width:28px;height:28px;border-radius:50%;border:2px solid white;box-shadow: 0 2px 4px rgba(0,0,0,0.2);display:flex;align-items:center;justify-content:center;"><i class="fa-solid fa-store text-[10px]"></i></div>`, 
+                    iconSize:[28,28], 
+                    iconAnchor:[14,14]
+                });
                 
-                customerLayer.addLayer(L.marker([c.Latitude, c.Longitude], {icon: icon}).bindPopup(`
-                    <div class="text-center pb-1">
-                        <div class="font-bold text-gray-800 text-sm border-b pb-1 mb-2">${c.CustomerName}</div>
-                        <div class="text-xs text-gray-500 mb-2">ยอด: <span class="font-bold text-emerald-600">${parseFloat(c.Sales2026_Baht||0).toLocaleString()}</span> บาท</div>
-                        <button onclick="openModal('${c.ID}')" class="w-full text-xs bg-indigo-600 hover:bg-indigo-700 transition-colors text-white px-3 py-1.5 rounded-lg shadow-sm font-medium">วิเคราะห์สินค้า</button>
-                    </div>
-                `));
+                customerLayer.addLayer(
+                    L.marker([c.Latitude, c.Longitude], {icon: icon}).bindPopup(`
+                    <div class="text-center pb-1 min-w-[150px]">
+                        <div class="font-bold text-gray-800 text-sm border-b border-gray-100 pb-1 mb-2">${c.CustomerName}</div>
+                        <div class="text-xs text-gray-500 mb-3">ยอดประเมิน: <span class="font-bold text-indigo-600">${sales.toLocaleString()}</span> บ.</div>
+                        <button onclick="openModal('${c.ID}')" class="w-full text-xs bg-indigo-600 hover:bg-indigo-700 transition-colors text-white px-3 py-2 rounded-lg shadow-sm font-medium">ดูสินค้าเปรียบเทียบ</button>
+                    </div>`)
+                );
             });
 
+            // อัปเดตตัวเลขหน้าแรก
             document.getElementById('total-customers').innerText = counter.toLocaleString();
             document.getElementById('total-sales').innerText = totalSales.toLocaleString();
             document.getElementById('table-count').innerText = `${counter} รายการ`;
             
-            if(customerLayer.getLayers().length > 0) map.fitBounds(customerLayer.getBounds(), {padding:[30,30]});
+            // หาคู่แข่งตัวท็อป
+            let topComp = "-";
+            let maxCount = 0;
+            for(let key in compCounts) {
+                if(compCounts[key] > maxCount) {
+                    maxCount = compCounts[key];
+                    topComp = key;
+                }
+            }
+            document.getElementById('top-competitor').innerText = topComp;
+
+            // วาดกราฟ
+            renderChart(compCounts);
+            
+            // ซูมแผนที่ให้พอดี
+            if(customerLayer.getLayers().length > 0) {
+                map.fitBounds(customerLayer.getBounds(), {padding: [40, 40]});
+            }
+        }
+
+        function renderChart(compCounts) {
+            const ctx = document.getElementById('marketShareChart').getContext('2d');
+            if(myChart) myChart.destroy();
+            
+            const labels = Object.keys(compCounts);
+            const data = Object.values(compCounts);
+            
+            if(labels.length === 0) {
+                labels.push("ไม่มีข้อมูล"); data.push(1);
+            }
+
+            myChart = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        data: data,
+                        backgroundColor: ['#6366f1', '#ec4899', '#f59e0b', '#10b981', '#8b5cf6', '#64748b'],
+                        borderWidth: 2,
+                        borderColor: '#ffffff'
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: { 
+                        legend: { position: 'right', labels: { font: { family: 'Prompt', size: 10 } } } 
+                    },
+                    cutout: '65%'
+                }
+            });
         }
 
         function openModal(custId) {
             const cust = globalData.customers.find(c => String(c.ID) === String(custId));
             document.getElementById('modal-cust-name').innerText = cust.CustomerName;
             document.getElementById('modal-cust-coords').innerText = `${parseFloat(cust.Latitude).toFixed(4)}, ${parseFloat(cust.Longitude).toFixed(4)}`;
+            document.getElementById('modal-cust-comp').innerText = cust.MainCompetitor || "ไม่ระบุ";
             
-            // กรอง Transaction เฉพาะของลูกค้าคนนี้
+            // ดึงข้อมูลรายการสินค้า (Transactions) ของลูกค้าคนนี้
             const txs = globalData.transactions.filter(t => String(t.CustomerID) === String(custId));
             const tbody = document.getElementById('modal-product-comparison');
             tbody.innerHTML = '';
 
-            if(txs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-4 text-sm text-gray-500">ไม่มีประวัติสินค้ารายย่อย</td></tr>';
+            if (txs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="3" class="text-center py-8 text-sm text-gray-400 bg-gray-50"><i class="fa-solid fa-box-open text-2xl mb-2 block"></i> ยังไม่มีการบันทึกข้อมูลสินค้าเปรียบเทียบ</td></tr>';
             } else {
                 txs.forEach(t => {
-                    // หาหน่วยวัดจาก Category Master Data
+                    // ดึงหน่วยวัดจาก Category Master
                     const catObj = globalData.categories.find(c => c.name === t.Category);
                     const unit = catObj ? catObj.unit : 'หน่วย';
+                    
+                    // เช็คฝั่ง (รองรับทั้งภาษาไทยและอังกฤษจาก Backend)
+                    const isOur = (t['Type(Our/Comp)'] === 'Our' || t.Type === 'Our' || t.Type === 'บริษัทเรา');
+                    const vol = parseFloat(t.SalesVolume) || 0;
 
                     tbody.innerHTML += `
-                    <tr class="hover:bg-gray-50/50 transition-colors group">
+                    <tr class="hover:bg-gray-100 transition-colors group">
                         <td class="px-5 py-3 border-b border-gray-100">
-                            <div class="text-xs font-bold text-gray-800 mb-0.5">${t.ProductName_FreeText || '-'}</div>
-                            <div class="text-[10px] text-gray-500 bg-gray-100 inline-block px-1.5 py-0.5 rounded">${t.Category}</div>
+                            <div class="text-sm font-bold text-gray-800">${t.ProductName_FreeText || '-'}</div>
+                            <div class="text-[10px] text-gray-500 bg-white border border-gray-200 inline-block px-2 py-0.5 rounded-full mt-1">${t.Category}</div>
                         </td>
-                        <td class="px-5 py-3 border-b border-gray-100 text-right text-xs bg-indigo-50/30">
-                            ${isOur ? `<span class="font-bold text-indigo-700 bg-indigo-100/50 px-2 py-1 rounded inline-block">${parseFloat(t.SalesVolume).toLocaleString()} ${unit}</span>` : '<span class="text-gray-300">-</span>'}
+                        <td class="px-5 py-3 border-b border-gray-100 text-right bg-indigo-50/40">
+                            ${isOur ? `<span class="font-bold text-indigo-700 bg-indigo-100 px-2.5 py-1 rounded-md text-xs border border-indigo-200">${vol.toLocaleString()} ${unit}</span>` : '<span class="text-gray-300 text-xs">-</span>'}
                         </td>
-                        <td class="px-5 py-3 border-b border-gray-100 text-right text-xs bg-rose-50/30">
-                            ${!isOur ? `<span class="font-bold text-rose-600 bg-rose-100/50 px-2 py-1 rounded inline-block">${parseFloat(t.SalesVolume).toLocaleString()} ${unit}</span>` : '<span class="text-gray-300">-</span>'}
+                        <td class="px-5 py-3 border-b border-gray-100 text-right bg-rose-50/40">
+                            ${!isOur ? `<span class="font-bold text-rose-700 bg-rose-100 px-2.5 py-1 rounded-md text-xs border border-rose-200">${vol.toLocaleString()} ${unit}</span>` : '<span class="text-gray-300 text-xs">-</span>'}
                         </td>
                     </tr>`;
                 });
             }
 
+            // แสดง Modal
             const m = document.getElementById('customerModal');
-            const c = document.getElementById('customerModalContent');
             m.classList.remove('hidden'); 
-            m.classList.add('flex'); 
-            
-            // Animation triggers
-            setTimeout(() => {
-                m.classList.remove('opacity-0');
-                c.classList.remove('translate-y-full', 'md:translate-y-4', 'md:scale-95');
-                c.classList.add('translate-y-0', 'md:scale-100');
-            }, 10);
+            m.classList.add('flex');
         }
         
         function closeCustomerModal() { 
             const m = document.getElementById('customerModal');
-            const c = document.getElementById('customerModalContent');
-            
-            // Animation reverse
-            m.classList.add('opacity-0');
-            c.classList.add('translate-y-full'); // Mobile slide down
-            if(window.innerWidth >= 768) {
-                c.classList.remove('translate-y-0', 'md:scale-100');
-                c.classList.add('md:translate-y-4', 'md:scale-95');
-            }
-            
-            setTimeout(() => {
-                m.classList.add('hidden');
-                m.classList.remove('flex');
-            }, 300); 
+            m.classList.add('hidden');
+            m.classList.remove('flex');
         }
 
-        // --- ระบบ Dynamic Form Rows ---
         let rowCount = 0;
         function addProductRow() {
             rowCount++;
             const div = document.createElement('div');
-            // ปรับ class ให้เรียงเป็นแถวบนจอใหญ่ และเป็น Card บนจอมือถือ
-            div.className = 'grid grid-cols-1 md:grid-cols-12 gap-3 mobile-card-row items-end md:items-center relative tx-row group';
+            // ออกแบบเป็น Card ให้ดูสวยบนมือถือ และเรียงเป็นแถวบนจอใหญ่
+            div.className = 'grid grid-cols-1 md:grid-cols-12 gap-3 p-4 bg-white border border-gray-200 rounded-xl relative tx-row items-end shadow-sm';
             div.id = `row-${rowCount}`;
             
             div.innerHTML = `
                 <div class="md:col-span-3">
-                    <label class="md:hidden text-[10px] font-bold text-gray-500 uppercase mb-1 block">ชื่อสินค้า (พิมพ์เอง)</label>
-                    <input type="text" placeholder="ระบุชื่อหรือยี่ห้อสินค้า..." class="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none tx-note transition-shadow" required>
+                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">ชื่อรายการ (สินค้า/ยี่ห้อ)</label>
+                    <input type="text" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none tx-note bg-gray-50 focus:bg-white transition-colors" placeholder="เช่น กระเบื้องลอนคู่..." required>
                 </div>
                 <div class="md:col-span-3 relative">
-                    <label class="md:hidden text-[10px] font-bold text-gray-500 uppercase mb-1 block">หมวดหมู่</label>
-                    <div class="relative">
-                        <select class="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none tx-category cursor-pointer appearance-none transition-shadow" onchange="updateUnitLabel(this, ${rowCount})" required>
-                            ${categoryOptionsHTML}
-                        </select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 top-2.5 text-gray-400 text-[10px] pointer-events-none"></i>
-                    </div>
+                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">หมวดหมู่ (สำคัญ)</label>
+                    <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none tx-category bg-gray-50 focus:bg-white appearance-none cursor-pointer" onchange="updateUnit(${rowCount})" required>
+                        ${categoryOptionsHTML}
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 bottom-2.5 text-[10px] text-gray-400 pointer-events-none"></i>
                 </div>
                 <div class="md:col-span-2 relative">
-                    <label class="md:hidden text-[10px] font-bold text-gray-500 uppercase mb-1 block">ฝ่ายที่ขายได้</label>
-                    <div class="relative">
-                        <select class="w-full border border-gray-300 rounded-lg pl-3 pr-8 py-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none tx-type cursor-pointer appearance-none font-medium text-gray-700 transition-shadow" required>
-                            <option value="Our">บริษัทเรา</option>
-                            <option value="Comp">คู่แข่ง</option>
-                        </select>
-                        <i class="fa-solid fa-chevron-down absolute right-3 top-2.5 text-gray-400 text-[10px] pointer-events-none"></i>
-                    </div>
+                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">ใครเป็นคนขาย?</label>
+                    <select class="w-full border border-gray-300 rounded-lg px-3 py-2 text-xs focus:ring-2 focus:ring-indigo-500 outline-none tx-type font-bold text-gray-700 bg-gray-50 focus:bg-white appearance-none cursor-pointer" required>
+                        <option value="Our">บริษัทเรา</option>
+                        <option value="Comp">คู่แข่ง</option>
+                    </select>
+                    <i class="fa-solid fa-chevron-down absolute right-3 bottom-2.5 text-[10px] text-gray-400 pointer-events-none"></i>
                 </div>
                 <div class="md:col-span-3 relative">
-                    <label class="md:hidden text-[10px] font-bold text-gray-500 uppercase mb-1 block">จำนวน / ยอดขาย</label>
-                    <div class="relative flex items-center">
-                        <input type="number" step="any" placeholder="0" class="w-full border border-gray-300 rounded-lg pl-3 pr-12 py-2 text-xs bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none tx-vol transition-shadow text-right font-mono" required>
-                        <span id="unit-label-${rowCount}" class="absolute right-3 text-[10px] text-gray-400 font-bold bg-white pl-1 pointer-events-none">หน่วย</span>
-                    </div>
+                    <label class="text-[10px] font-bold text-gray-500 uppercase block mb-1">ยอดขาย / จำนวน</label>
+                    <input type="number" step="any" class="w-full border border-gray-300 rounded-lg pl-3 pr-12 py-2 text-xs font-mono text-right focus:ring-2 focus:ring-indigo-500 outline-none tx-vol bg-indigo-50/30" placeholder="0" required>
+                    <span id="unit-label-${rowCount}" class="absolute right-3 bottom-2 text-[10px] font-bold text-indigo-400 bg-transparent pointer-events-none">หน่วย</span>
                 </div>
-                <div class="md:col-span-1 flex items-center justify-end md:justify-center mt-2 md:mt-0">
-                    <button type="button" onclick="document.getElementById('row-${rowCount}').remove()" class="text-gray-400 hover:text-rose-500 hover:bg-rose-50 w-8 h-8 rounded-lg text-sm flex items-center justify-center transition-colors border border-transparent hover:border-rose-200" title="ลบรายการ"><i class="fa-solid fa-trash-can"></i></button>
+                <div class="md:col-span-1 flex justify-end md:justify-center mt-2 md:mt-0">
+                    <button type="button" onclick="document.getElementById('row-${rowCount}').remove()" class="w-full md:w-auto text-gray-400 hover:text-rose-500 hover:bg-rose-50 p-2 rounded-lg transition-colors border border-transparent hover:border-rose-200 flex items-center justify-center" title="ลบรายการนี้">
+                        <i class="fa-solid fa-trash-can mr-1 md:mr-0"></i><span class="md:hidden text-xs">ลบแถวนี้</span>
+                    </button>
                 </div>
             `;
             document.getElementById('product-rows-container').appendChild(div);
         }
 
-        // --- ระบบ Submit บันทึกข้อมูล ---
+        // เปลี่ยนตัวหนังสือ "หน่วย" อัตโนมัติตามหมวดหมู่
+        function updateUnit(id) {
+            const select = document.querySelector(`#row-${id} .tx-category`);
+            const unit = select.options[select.selectedIndex].getAttribute('data-unit') || 'หน่วย';
+            document.getElementById(`unit-label-${id}`).innerText = unit;
+        }
+
         document.getElementById('add-data-form').addEventListener('submit', function(e) {
             e.preventDefault();
             const btn = document.getElementById('btn-submit'); 
             const stat = document.getElementById('form-status');
             
+            // เปิดโหมดโหลด
             btn.innerHTML = '<i class="fa-solid fa-circle-notch fa-spin mr-2"></i> กำลังบันทึกข้อมูล...'; 
             btn.classList.add('opacity-80', 'cursor-not-allowed');
             btn.disabled = true;
-            stat.classList.remove('hidden');
-            stat.innerHTML = '<span class="text-indigo-600 font-medium text-xs"><i class="fa-solid fa-spinner fa-spin mr-1"></i> เชื่อมต่อฐานข้อมูล...</span>'; 
-            stat.className = "text-sm px-4 py-2 rounded-lg w-full md:w-auto text-center bg-indigo-50 border border-indigo-100";
-
-            div.id = `row-${rowCount}`;
             
-            div.innerHTML = `
-                <div class="md:col-span-3">
-                    <label class="md:hidden text-[10px] font-bold text-gray-500">หมวดหมู่</label>
-                    <select class="w-full border rounded px-2 py-1.5 text-xs bg-white tx-category" onchange="updateUnitLabel(this, ${rowCount})" required>
-                        ${categoryOptionsHTML}
-                    </select>
-                </div>
-                <div class="md:col-span-3">
-                    <label class="md:hidden text-[10px] font-bold text-gray-500">แบรนด์/รายละเอียด</label>
-                    <input type="text" placeholder="ระบุหรือไม่ก็ได้..." class="w-full border rounded px-2 py-1.5 text-xs bg-white tx-note">
-                </div>
-                <div class="md:col-span-2 relative">
-                    <label class="md:hidden text-[10px] font-bold text-blue-600">เราขายได้</label>
-                    <input type="number" step="any" placeholder="0" class="w-full border border-blue-200 bg-blue-50 rounded px-2 py-1.5 text-xs tx-our">
-                    <span id="unit-our-${rowCount}" class="absolute right-2 top-1.5 md:top-2 text-[10px] text-gray-400 font-bold">หน่วย</span>
-                </div>
-                <div class="md:col-span-2 relative">
-                    <label class="md:hidden text-[10px] font-bold text-red-600">คู่แข่งขายได้</label>
-                    <input type="number" step="any" placeholder="0" class="w-full border border-red-200 bg-red-50 rounded px-2 py-1.5 text-xs tx-comp">
-                    <span id="unit-comp-${rowCount}" class="absolute right-2 top-1.5 md:top-2 text-[10px] text-gray-400 font-bold">หน่วย</span>
-                </div>
-                <div class="md:col-span-2 flex items-end md:items-center justify-end">
-                    <button type="button" onclick="document.getElementById('row-${rowCount}').remove()" class="text-red-500 hover:bg-red-50 px-2 py-1 rounded text-xs"><i class="fa-solid fa-trash mr-1"></i> ลบ</button>
-                </div>
-            `;
-            document.getElementById('product-rows-container').appendChild(div);
-        }
+            stat.classList.remove('hidden');
+            stat.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังส่งต่อข้อมูลไปยัง Google Sheets...'; 
+            stat.className = "text-sm px-4 py-3 rounded-lg w-full md:w-auto text-center bg-indigo-50 border border-indigo-200 text-indigo-700 font-bold";
 
-        // ฟังก์ชันเปลี่ยนชื่อหน่วยวัดอัตโนมัติตอนเลือก Dropdown
-        function updateUnitLabel(selectElement, rowId) {
-            const selectedOption = selectElement.options[selectElement.selectedIndex];
-            const unit = selectedOption.getAttribute('data-unit') || 'หน่วย';
-            document.getElementById(`unit-our-${rowId}`).innerText = unit;
-            document.getElementById(`unit-comp-${rowId}`).innerText = unit;
-        }
-
-        // --- ระบบ Submit บันทึกข้อมูล ---
-        document.getElementById('add-data-form').addEventListener('submit', function(e) {
-            e.preventDefault();
-            const btn = document.getElementById('btn-submit'); const stat = document.getElementById('form-status');
-            btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-2"></i> กำลังบันทึก...'; btn.disabled = true;
-
+            // รวบรวมคู่แข่งที่เลือก (Checkbox)
             const selectedComps = Array.from(document.querySelectorAll('.comp-cb:checked')).map(cb=>cb.value);
             
-            // รวบรวมข้อมูล Transactions จากแต่ละแถว
+            // รวบรวมข้อมูล Transaction ของแต่ละแถวสินค้า
             let txArray = [];
             document.querySelectorAll('.tx-row').forEach(row => {
                 const cat = row.querySelector('.tx-category').value;
-                if(cat) { // เอาเฉพาะแถวที่เลือกหมวดหมู่แล้ว
+                if(cat) { 
                     txArray.push({
                         category: cat,
                         note: row.querySelector('.tx-note').value,
-                        ourVol: parseFloat(row.querySelector('.tx-our').value) || 0,
-                        compVol: parseFloat(row.querySelector('.tx-comp').value) || 0
+                        type: row.querySelector('.tx-type').value,
+                        vol: parseFloat(row.querySelector('.tx-vol').value) || 0
                     });
                 }
             });
 
+            // จัด Package ให้อยู่ในฟอร์แมต JSON
             const payload = {
                 action: 'addCustomerWithTx',
                 customer: {
-                    id: Date.now(), 
+                    id: Date.now().toString(), // สร้าง ID มั่วๆ อ้างอิงจากเวลา
                     name: document.getElementById('form-name').value,
                     lat: parseFloat(document.getElementById('form-lat').value), 
                     lng: parseFloat(document.getElementById('form-lng').value),
                     sales26: parseFloat(document.getElementById('form-sales').value) || 0,
-                    competitors: selectedComps
+                    competitors: selectedComps // Array รายชื่อ
                 },
-                transactions: txArray
+                transactions: txArray // Array ของสินค้าหลายๆ ชิ้น
             };
 
+            // ยิงไปหา Google Apps Script (ยิงแบบ text/plain หลบ CORS)
             fetch(GAS_WEB_APP_URL, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain;charset=utf-8' },
                 body: JSON.stringify(payload)
-            }).then(r=>r.json()).then(res => {
-                if(res.status==="success") { 
-                    stat.innerHTML = '<span class="text-emerald-700 font-bold text-xs"><i class="fa-solid fa-circle-check mr-1"></i> บันทึกข้อมูลสำเร็จ!</span>'; 
-                    stat.className = "text-sm px-4 py-2 rounded-lg w-full md:w-auto text-center bg-emerald-50 border border-emerald-200 shadow-sm";
+            })
+            .then(r => r.json())
+            .then(res => {
+                if(res.status === "success") { 
+                    stat.innerHTML = '<i class="fa-solid fa-circle-check mr-2"></i> บันทึกข้อมูลสำเร็จเรียบร้อย!'; 
+                    stat.className = "text-sm px-4 py-3 rounded-lg w-full md:w-auto text-center bg-emerald-50 border border-emerald-200 text-emerald-700 font-bold shadow-sm";
                     
-                    // หน่วงเวลาให้เห็นข้อความสำเร็จก่อนโหลดหน้าใหม่
                     setTimeout(() => {
                         window.scrollTo({top:0, behavior:'smooth'});
-                        setTimeout(()=>window.location.reload(), 500); 
+                        setTimeout(() => window.location.reload(), 500); 
                     }, 1500); 
-                } else throw new Error(res.message);
-            }).catch(err => { 
-                stat.innerHTML = `<span class="text-rose-700 font-bold text-xs"><i class="fa-solid fa-circle-exclamation mr-1"></i> ข้อผิดพลาด: ${err.message}</span>`; 
-                stat.className = "text-sm px-4 py-2 rounded-lg w-full md:w-auto text-center bg-rose-50 border border-rose-200 shadow-sm";
-                btn.innerHTML='<i class="fa-solid fa-cloud-arrow-up"></i> บันทึกข้อมูลเข้าระบบ'; 
+                } else {
+                    throw new Error(res.message);
+                }
+            })
+            .catch(err => { 
+                stat.innerHTML = `<i class="fa-solid fa-circle-exclamation mr-2"></i> บันทึกไม่สำเร็จ: ${err.message}`; 
+                stat.className = "text-sm px-4 py-3 rounded-lg w-full md:w-auto text-center bg-rose-50 border border-rose-200 text-rose-700 font-bold shadow-sm";
+                
+                btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up"></i> ลองบันทึกใหม่อีกครั้ง'; 
                 btn.classList.remove('opacity-80', 'cursor-not-allowed');
-                btn.disabled=false; 
+                btn.disabled = false; 
             });
         });
     </script>
